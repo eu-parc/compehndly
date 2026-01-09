@@ -13,6 +13,21 @@ def register(registry_name, name, version):
     return decorator
 
 
+# ---------------- STANDARDIZE ----------------------
+
+
+def _standardize_v0_0_1_reference(
+    measured: float,
+    standard: float,
+) -> float:
+    return 100 * measured / standard
+
+
+@register(registry_name="default", name="standardize", version="0.0.1")
+def _standardize_v0_0_1_arrow(measured: pa.Array, standard: pa.Array) -> pa.Array:
+    return pc.divide(pc.multiply(measured, 100), standard)
+
+
 # ---------------- URINARY BIOMARKERS ----------------------
 
 
@@ -21,16 +36,12 @@ def _standardize_creatinine_v0_0_1_reference(
     crt: float,
 ) -> float:
     "measured in micrograms/L, crt in mg/dL"
-    ret = 100 * measured / crt
-
-    return ret
+    return _standardize_v0_0_1_reference(measured, crt)
 
 
 @register(registry_name="default", name="standardize_creatinine", version="0.0.1")
 def _standardize_creatinine_v0_0_1_arrow(measured: pa.Array, crt: pa.Array) -> pa.Array:
-    ret = pc.divide(pc.multiply(measured, 100), crt)
-
-    return ret
+    return _standardize_v0_0_1_arrow(measured, crt)
 
 
 def _normalize_specific_gravity_v0_0_1_reference(
@@ -57,26 +68,25 @@ def _normalize_specific_gravity_v0_0_1_arrow(measured: pa.Array, sg_measured: pa
     return ret
 
 
-# ---------------- LIPID SOLUBLE BIOMARKERS IN BLOOD ----------------------
+# ---------------- LIPID SOLUBLE BIOMARKERS ----------------------
+
+
+def _total_lipid_concentration_v0_0_1_reference(chol: float, trigl: float) -> float:
+    return 2.27 * chol + trigl + 62.3
+
+
+@register(registry_name="default", name="total_lipid_concentration", version="0.0.1")
+def _total_lipid_concentration_v0_0_1_arrow(chol: pa.Array, trigl: pa.Array) -> pa.Array:
+    return pc.add(pc.multiply(chol, 2.27), pc.add(trigl, 62.3))
 
 
 def _standardize_lipid_v0_0_1_reference(
     measured: float,
     lipid_value: float,
 ) -> float:
-    ret = 100 * measured / lipid_value
-
-    return ret
+    return _standardize_v0_0_1_reference(measured, lipid_value)
 
 
 @register(registry_name="default", name="normalize_specific_gravity", version="0.0.1")
 def _standardize_lipid_v0_0_1_arrow(measured: pa.Array, lipid_value: pa.Array) -> pa.Array:
-    ret = pc.divide(
-        pc.multiply(measured, 100),
-        lipid_value,
-    )
-
-    return ret
-
-
-# ---------------- LIPID SOLUBLE BIOMARKERS IN MILK ----------------------
+    return _standardize_v0_0_1_arrow(measured, lipid_value)
