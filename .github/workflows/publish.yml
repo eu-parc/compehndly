@@ -67,7 +67,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist
-          path: ./python/dist/
+          path: dist
 
       - name: Publish package to TestPyPI (on tag push)
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
