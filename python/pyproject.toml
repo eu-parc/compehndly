@@ -5,37 +5,32 @@ description = "Personal Exposure Health Registry"
 readme = "README.md"
 authors = [
     { name = "Gertjan Bisschop", email = "gertjan.bisschop@vito.be" },
-    { name = "Dirk Devriendt", email = "dirk.devriendt@vito.be" },
     { name = "Caio Mescouto", email = "caio.mescouto@vito.be" },
 ]
-requires-python = ">=3.10, <4.0.0"
+requires-python = ">=3.11, <4.0.0"
 dependencies = [
 	"pyarrow >= 22.0, <23.0",
 	"scipy",
 ]
 
 [dependency-groups]
-test = [
-    "pytest>=8.2.0,<9",
-	"polars>=1.0, < 2.0",
-	"pandas>=2.0, < 3.0"
-]
-
 dev = [
     "ruff>=0.4.4,<0.5",
     "black",
     "mypy",
     "isort",
     "pytest-cov>=7.0.0",
+	"pytest>=8.2.0,<9",
 ]
 
 [tool.uv]
 default-groups = [
-    "test",
     "dev",
 ]
 
 [project.optional-dependencies]
+test-core = ["pytest>=8.2.0,<9",]
+
 polars = [
     "polars>=1.0,<2.0"
 ]
@@ -81,7 +76,7 @@ addopts = [
     "--import-mode=importlib",
 ]
 markers = [
-	"base: base functionality",
+	"core: core functionality",
 	"polars: polars dependency",
 	"numpy: numpy dependency",
 	"pandas: pandas dependency",

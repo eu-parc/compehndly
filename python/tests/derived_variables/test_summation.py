@@ -26,6 +26,7 @@ def run_reference_rowwise(*arrays, all_required):
     return out
 
 
+@pytest.mark.core
 class TestSummation:
     def test_summation_matches_reference(self):
         a = pa.array([1.0, None, 3.0])

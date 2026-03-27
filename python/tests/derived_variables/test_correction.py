@@ -41,6 +41,7 @@ def sample_arrays():
     }
 
 
+@pytest.mark.core
 class TestStandardize:
     def test_standardize_reference_basic(self, sample_measurements):
         result = _standardize_v0_0_1_reference(sample_measurements["measured"], sample_measurements["standard"])
@@ -86,6 +87,7 @@ class TestStandardize:
         assert arrow_result[0].as_py() == ref_result
 
 
+@pytest.mark.core
 class TestStandardizeCreatinine:
     def test_standardize_creatinine_reference_basic(self, sample_measurements):
         result = _standardize_creatinine_v0_0_1_reference(sample_measurements["measured"], sample_measurements["crt"])
@@ -100,6 +102,7 @@ class TestStandardizeCreatinine:
         assert result.equals(expected)
 
 
+@pytest.mark.core
 class TestNormalizeSpecificGravity:
     def test_normalize_specific_gravity_reference_basic(self, sample_measurements):
         result = _normalize_specific_gravity_v0_0_1_reference(
@@ -151,6 +154,7 @@ class TestNormalizeSpecificGravity:
         assert pytest.approx(arrow_result[0].as_py(), rel=1e-6) == ref_result
 
 
+@pytest.mark.core
 class TestTotalLipidConcentration:
     def test_total_lipid_concentration_reference_basic(self, sample_measurements):
         result = _total_lipid_concentration_v0_0_1_reference(sample_measurements["chol"], sample_measurements["trigl"])
@@ -198,6 +202,7 @@ class TestTotalLipidConcentration:
         assert pytest.approx(arrow_result[0].as_py(), rel=1e-6) == ref_result
 
 
+@pytest.mark.core
 class TestStandardizeLipid:
     def test_standardize_lipid_reference_basic(self, sample_measurements):
         lipid_value = 666.3

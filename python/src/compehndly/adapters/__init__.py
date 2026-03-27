@@ -10,6 +10,7 @@ _ADAPTERS = {}
 
 def register_adapter(adapter: ArrayAdapter):
     _ADAPTERS[adapter.name] = adapter
+    logger.info(f"Registered adapter for {adapter.name}")
 
 
 def register_all_adapters():
@@ -20,6 +21,6 @@ def register_all_adapters():
             AdapterClass = ep.load()
             register_adapter(AdapterClass())
         except ImportError as e:
-            logger.warning(f"Failed to load {ep.name}: {e}")
+            pass
 
     register_adapter(ArrayAdapter())

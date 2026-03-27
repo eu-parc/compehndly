@@ -1,7 +1,11 @@
 import compehndly
+import pytest
+
+from typing import Callable
 
 
-class TestBuildRegistry:
+@pytest.mark.core
+class TestTestRegistry:
     def test_build(self):
         to_register = ["tests.utils"]
         registry = compehndly.FunctionRegistry.build_registry(to_register)
@@ -16,3 +20,8 @@ class TestFunctionAccessor:
         compehndly._set_registry_builder(lambda: compehndly.FunctionRegistry.build_registry(_to_register=to_register))
         f = compehndly.add_one["0.0.1"]
         assert callable(f)
+
+
+class TestTrueRegistry:
+    f = compehndly.medium_bound_imputation["0.0.1"]
+    assert isinstance(f, Callable)

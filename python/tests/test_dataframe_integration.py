@@ -4,7 +4,7 @@ import pytest
 import compehndly
 
 
-@pytest.mark.base
+@pytest.mark.core
 class TestIntegration:
     @pytest.fixture(scope="module")
     def registry(self):

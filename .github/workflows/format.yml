@@ -17,19 +17,19 @@ jobs:
         working-directory: ./python
     strategy:
       matrix:
-        python-version: ['3.10']
+        python-version: ['3.11']
 
     steps:
     - name: Cancel Previous Runs
-      uses: styfle/cancel-workflow-action@0.12.1
+      uses: styfle/cancel-workflow-action@0.13.1
       with:
         access_token: ${{ github.token }}
     
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6.0.2
     
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6.1.0
       with:
         python-version: ${{ matrix.python-version }}
         

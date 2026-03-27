@@ -9,7 +9,11 @@ from compehndly.adapters import _ADAPTERS
 
 logger = logging.getLogger(__name__)
 
-TO_REGISTER = ["compehndly.utils.example_function"]
+TO_REGISTER = [
+    "compehndly.derived_variables.correction",
+    "compehndly.derived_variables.imputation",
+    "compehndly.derived_variables.summation",
+]
 
 
 class FunctionRegistry:
