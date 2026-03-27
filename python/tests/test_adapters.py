@@ -6,11 +6,14 @@ import compehndly
 @pytest.mark.polars
 class TestPolarsAdapter:
     @pytest.fixture(scope="class")
-    def pl(self):
-        import polars as pl
+    def polars_module(self):
+        import polars
 
-    def test_lazy_frame(self, pl):
+        return polars
+
+    def test_lazy_frame(self, polars_module):
         # Input data as a LazyFrame
+        pl = polars_module
         lf = pl.LazyFrame(
             {
                 "measured": [1.0, 2.0, 3.0],

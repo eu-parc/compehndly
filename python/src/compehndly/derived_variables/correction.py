@@ -90,6 +90,7 @@ def _standardize_lipid_v0_0_1_reference(
 ) -> float:
     return _standardize_v0_0_1_reference(measured, lipid_value)
 
+
 @register(registry_name="default", name="standardize_lipid", version="0.0.1")
 def _standardize_lipid_v0_0_1_arrow(measured: pa.Array, lipid_value: pa.Array) -> pa.Array:
     return _standardize_v0_0_1_arrow(measured, lipid_value)
