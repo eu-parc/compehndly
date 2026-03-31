@@ -1,0 +1,159 @@
+{
+  "version": "0.0.1",
+  "cases": [
+    {
+      "id": "summation_all_required_true",
+      "function": "summation",
+      "input": {
+        "positional": [[1.0, null, 3.0], [null, 5.0, 1.0], [2.0, 2.0, null]]
+      },
+      "params": {"all_required": true},
+      "assertions": {
+        "expected": [3.0, 7.0, 4.0]
+      }
+    },
+    {
+      "id": "summation_entire_null_series_returns_all_null",
+      "function": "summation",
+      "input": {
+        "positional": [[1.0, 2.0, 3.0], [null, null, null], [1.0, 1.0, 1.0]]
+      },
+      "params": {"all_required": true},
+      "assertions": {
+        "all_null": true
+      }
+    },
+    {
+      "id": "summation_not_all_required",
+      "function": "summation",
+      "input": {
+        "positional": [[1.0, null, 3.0], [null, 2.0, null]]
+      },
+      "params": {"all_required": false},
+      "assertions": {
+        "expected": [1.0, 2.0, 3.0]
+      }
+    },
+    {
+      "id": "summation_length_mismatch_raises",
+      "function": "summation",
+      "input": {
+        "positional": [[1.0, 2.0], [1.0]]
+      },
+      "expect_error": {
+        "type": "ValueError"
+      }
+    },
+    {
+      "id": "standardize_basic",
+      "function": "standardize",
+      "input": {
+        "positional": [[50.0, 100.0, 75.0, 0.0], [25.0, 50.0, 25.0, 10.0]]
+      },
+      "assertions": {
+        "expected": [200.0, 200.0, 300.0, 0.0]
+      }
+    },
+    {
+      "id": "standardize_with_nulls",
+      "function": "standardize",
+      "input": {
+        "positional": [[50.0, null, 75.0], [25.0, 50.0, null]]
+      },
+      "assertions": {
+        "expected": [200.0, null, null]
+      }
+    },
+    {
+      "id": "standardize_creatinine_basic",
+      "function": "standardize_creatinine",
+      "input": {
+        "positional": [[50.0, 100.0, 75.0], [100.0, 80.0, 120.0]]
+      },
+      "assertions": {
+        "expected": [50.0, 125.0, 62.5]
+      }
+    },
+    {
+      "id": "normalize_specific_gravity_basic_named",
+      "function": "normalize_specific_gravity",
+      "input": {
+        "named": {
+          "measured": [50.0, 100.0, 75.0],
+          "sg_measured": [1.020, 1.015, 1.025]
+        }
+      },
+      "params": {"sg_ref": 1.024},
+      "assertions": {
+        "expected": [1.1764705882352942, 2.3645320197044337, 1.7560975609756098]
+      }
+    },
+    {
+      "id": "total_lipid_concentration_basic",
+      "function": "total_lipid_concentration",
+      "input": {
+        "positional": [[200.0, 180.0, 220.0, 190.0], [150.0, 120.0, 180.0, 140.0]]
+      },
+      "assertions": {
+        "expected": [666.3, 590.9, 741.7, 633.6]
+      }
+    },
+    {
+      "id": "standardize_lipid_basic",
+      "function": "standardize_lipid",
+      "input": {
+        "positional": [[50.0, 100.0, 75.0], [666.3, 590.9, 724.3]]
+      },
+      "assertions": {
+        "expected": [7.5041272699984995, 16.923337282112033, 10.354825348612454]
+      }
+    },
+    {
+      "id": "medium_bound_imputation_scalar_input",
+      "function": "medium_bound_imputation_scalar_input",
+      "input": {
+        "positional": [[0.2, 1.2, 2.5]]
+      },
+      "params": {"loq": 2.0, "lod": 1.0},
+      "assertions": {
+        "expected": [0.5, 1.5, 2.5]
+      }
+    },
+    {
+      "id": "random_single_imputation_basic",
+      "function": "random_single_imputation",
+      "input": {
+        "positional": [[5.0, -1.0, -2.0, 10.0, -3.0, 8.0]]
+      },
+      "params": {"lod": 2.0, "loq": 4.0, "seed": 123},
+      "assertions": {
+        "non_negative": true,
+        "equals_at_indices": {
+          "0": 5.0,
+          "3": 10.0,
+          "5": 8.0
+        }
+      }
+    },
+    {
+      "id": "random_single_imputation_bounds_respected",
+      "function": "random_single_imputation",
+      "input": {
+        "positional": [[-1.0, -2.0, -3.0, 4.1, 5.2, 6.3, 7.4, 8.5]]
+      },
+      "params": {"lod": 2.0, "loq": 4.0, "seed": 42},
+      "assertions": {
+        "ranges_at_indices": {
+          "0": [0.0, 2.0],
+          "1": [2.0, 4.0],
+          "2": [0.0, 4.0]
+        },
+        "min_value_from_index": {
+          "start": 3,
+          "value": 4.0
+        },
+        "no_nan": true
+      }
+    }
+  ]
+}

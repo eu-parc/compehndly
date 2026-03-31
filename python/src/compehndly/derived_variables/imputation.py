@@ -1,55 +1,13 @@
+from __future__ import annotations
+
 import numpy as np
-import pyarrow as pa
-import pyarrow.compute as pc
+import polars as pl
 
 from compehndly.derived_variables.statsutils import fit_censored_lognorm
-
-__registrations__ = []
-
-
-# TODO: move decorator for joint use
-def register(registry_name, name, version):
-    def decorator(func):
-        __registrations__.append((registry_name, name, version, func))
-        return func
-
-    return decorator
+from compehndly.polars.kernels import DerivedFunctionSpec
 
 
-def _medium_bound_imputation_v0_0_1_reference(
-    measurement: float,
-    loq: float,
-    lod: float | None = None,
-) -> float:
-    if lod is not None:
-        assert lod > 0.0
-    assert loq > 0.0
-    ret = measurement
-
-    if lod is None:
-        if measurement < loq:
-            ret = loq / 2
-    else:
-        assert lod < loq
-        if measurement < lod:
-            ret = lod / 2
-        elif measurement < loq:
-            ret = (loq + lod) / 2
-
-    return ret
-
-
-@register(registry_name="default", name="medium_bound_imputation", version="0.0.1")
-def _medium_bound_imputation_v0_0_1_arrow(
-    measurement: pa.Array,
-    loq: float,
-    lod: float | None = None,
-) -> pa.Array:
-    """
-    Vectorized medium-bound imputation.
-
-    """
-
+def _validate_scalar_thresholds(loq: float, lod: float | None = None) -> None:
     if loq <= 0:
         raise ValueError("loq must be > 0")
 
@@ -59,110 +17,140 @@ def _medium_bound_imputation_v0_0_1_arrow(
         if lod >= loq:
             raise ValueError("lod must be < loq")
 
-    # Start with identity (original measurement)
-    result = measurement
+
+def medium_bound_imputation_scalar_input_kernel(
+    measurement: pl.Series,
+    loq: float,
+    lod: float | None = None,
+) -> pl.Series:
+    _validate_scalar_thresholds(loq, lod)
+
+    measurement_np = measurement.cast(pl.Float64).to_numpy()
+    result = measurement_np.copy()
 
     if lod is None:
-        # measurement < loq → loq / 2
-        mask = pc.less(measurement, loq)
-        result = pc.if_else(mask, loq / 2, result)
-
-    else:
-        # measurement < lod → lod / 2
-        mask_below_lod = pc.less(measurement, lod)
-        result = pc.if_else(mask_below_lod, lod / 2, result)
-
-        # lod <= measurement < loq → (lod + loq) / 2
-        mask_between = pc.and_(
-            pc.greater_equal(measurement, lod),
-            pc.less(measurement, loq),
+        mask = (measurement_np < loq) & ~np.isnan(measurement_np)
+        result[mask] = loq / 2
+        return pl.Series(
+            name=measurement.name, values=result, dtype=pl.Float64
         )
-        result = pc.if_else(mask_between, (lod + loq) / 2, result)
 
-    return result
+    mask_below_lod = (measurement_np < lod) & ~np.isnan(measurement_np)
+    result[mask_below_lod] = lod / 2
+
+    midpoint = (lod + loq) / 2
+    mask_between = (
+        (measurement_np >= lod)
+        & (measurement_np < loq)
+        & ~np.isnan(measurement_np)
+    )
+    result[mask_between] = midpoint
+    return pl.Series(name=measurement.name, values=result, dtype=pl.Float64)
 
 
-@register(registry_name="default", name="medium_bound_imputation_array", version="0.0.1")
-def _medium_bound_imputation_v0_0_1_arrow_array(
-    measurement: pa.Array,
-    loq: pa.Array,
-    lod: pa.Array | None = None,
-) -> pa.Array:
-    """
-    Vectorized medium-bound imputation with row-wise LOQ / LOD arrays.
-    """
+def medium_bound_imputation_scalar_input_expr(
+    measurement: pl.Expr,
+    loq: float,
+    lod: float | None = None,
+) -> pl.Expr:
+    _validate_scalar_thresholds(loq, lod)
 
+    result = measurement
+    if lod is None:
+        return pl.when(measurement < loq).then(loq / 2).otherwise(result)
+
+    result = pl.when(measurement < lod).then(lod / 2).otherwise(result)
+    midpoint = (lod + loq) / 2
+    return (
+        pl.when((measurement >= lod) & (measurement < loq))
+        .then(midpoint)
+        .otherwise(result)
+    )
+
+
+def medium_bound_imputation_kernel(
+    measurement: pl.Series,
+    loq: pl.Series,
+    lod: pl.Series | None = None,
+) -> pl.Series:
     length = len(measurement)
-
     if len(loq) != length:
         raise ValueError("measurement and loq must have the same length")
-
     if lod is not None and len(lod) != length:
         raise ValueError("measurement and lod must have the same length")
 
-    result = measurement
+    measurement_np = measurement.cast(pl.Float64).to_numpy()
+    loq_np = loq.cast(pl.Float64).to_numpy()
+    result = measurement_np.copy()
 
     if lod is None:
-        # measurement < loq → loq / 2
-        mask = pc.less(measurement, loq)
-        result = pc.if_else(mask, pc.divide(loq, 2.0), result)
-
-    else:
-        # measurement < lod → lod / 2
-        mask_below_lod = pc.less(measurement, lod)
-        result = pc.if_else(mask_below_lod, pc.divide(lod, 2.0), result)
-
-        # lod <= measurement < loq → (lod + loq) / 2
-        mask_between = pc.and_(
-            pc.greater_equal(measurement, lod),
-            pc.less(measurement, loq),
+        mask = (
+            (measurement_np < loq_np)
+            & ~np.isnan(measurement_np)
+            & ~np.isnan(loq_np)
         )
-        midpoint = pc.divide(pc.add(lod, loq), 2.0)
-        result = pc.if_else(mask_between, midpoint, result)
+        result[mask] = loq_np[mask] / 2
+        return pl.Series(
+            name=measurement.name, values=result, dtype=pl.Float64
+        )
 
-    return result
+    lod_np = lod.cast(pl.Float64).to_numpy()
+
+    mask_below_lod = (
+        (measurement_np < lod_np)
+        & ~np.isnan(measurement_np)
+        & ~np.isnan(lod_np)
+    )
+    result[mask_below_lod] = lod_np[mask_below_lod] / 2
+
+    midpoint = (lod_np + loq_np) / 2
+    mask_between = (
+        (measurement_np >= lod_np)
+        & (measurement_np < loq_np)
+        & ~np.isnan(measurement_np)
+        & ~np.isnan(lod_np)
+        & ~np.isnan(loq_np)
+    )
+    result[mask_between] = midpoint[mask_between]
+
+    return pl.Series(name=measurement.name, values=result, dtype=pl.Float64)
 
 
-def _random_single_imputation_reference_v0_0_1(
-    measurement: float,
-    loq: float,
-    lod: float | None = None,
-) -> float:
-    # TODO:
-    pass
+def medium_bound_imputation_expr(
+    measurement: pl.Expr,
+    loq: pl.Expr,
+    lod: pl.Expr | None = None,
+) -> pl.Expr:
+    result = measurement
+    if lod is None:
+        return pl.when(measurement < loq).then(loq / 2).otherwise(result)
+
+    result = pl.when(measurement < lod).then(lod / 2).otherwise(result)
+    midpoint = (lod + loq) / 2
+    return (
+        pl.when((measurement >= lod) & (measurement < loq))
+        .then(midpoint)
+        .otherwise(result)
+    )
 
 
-@register(registry_name="default", name="random_single_imputation", version="0.0.1")
-def _random_single_imputation_arrow_v0_0_1(
-    biomarker_pa: pa.Array,
+def random_single_imputation_kernel(
+    biomarker: pl.Series,
     lod: float,
     loq: float,
     seed: int | None = None,
-) -> pa.Array:
-    """
-    Perform random single imputation for left-censored lognormal data
-    using PyArrow arrays for maximum compatibility.
+) -> pl.Series:
+    _validate_scalar_thresholds(loq, lod)
 
-    biomarker_pa : arrow array of floats or censored indicators (-1, -2, -3)
-    lod       : limit of detection
-    loq       : limit of quantification
-    """
+    biomarker_np = biomarker.cast(pl.Float64).to_numpy()
+    biomarker_filled = np.where(np.isnan(biomarker_np), -1.0, biomarker_np)
 
-    # Convert Arrow → NumPy
-    # NOTE: suboptimal solution
-    biomarker = biomarker_pa.to_numpy(zero_copy_only=False)
-
-    # Fill NA as -1 (your original convention)
-    is_na = np.isnan(biomarker)
-    biomarker_filled = np.where(is_na, -1, biomarker)
-
-    # Censored if negative category code
     censored = biomarker_filled < 0
     values_np = np.where(censored, lod, biomarker_filled)
+
     dist = fit_censored_lognorm(values_np, censored)
     rng = np.random.default_rng(seed=seed)
 
-    # Compute sampling bounds (vectorized)
     lower = np.zeros_like(biomarker_filled, dtype=float)
     upper = np.zeros_like(biomarker_filled, dtype=float)
 
@@ -170,26 +158,60 @@ def _random_single_imputation_arrow_v0_0_1(
     cat_between = biomarker_filled == -2
     cat_below_loq = biomarker_filled == -3
 
-    # <LOD -> [0, LOD]
     lower[cat_below_lod] = 0
     upper[cat_below_lod] = lod
-    # Between LOD & LOQ -> [LOD, LOQ]
+
     lower[cat_between] = lod
     upper[cat_between] = loq
 
-    # <LOQ -> [0, LOQ]
     lower[cat_below_loq] = 0
     upper[cat_below_loq] = loq
 
-    # Convert bounds to CDF space
     cdf_lo = dist.cdf(lower)
     cdf_hi = dist.cdf(upper)
 
-    # generate U ~ Uniform(cdf_lo, cdf_hi)
     u = rng.uniform(cdf_lo, cdf_hi)
     imputed = dist.ppf(u)
-    # replace censored with imputed
-    result = biomarker.copy()
+
+    result = biomarker_filled.copy()
     result[censored] = imputed[censored]
 
-    return pa.array(result)
+    return pl.Series(result, dtype=pl.Float64)
+
+
+def random_single_imputation_expr(
+    biomarker: pl.Expr,
+    lod: float,
+    loq: float,
+    seed: int | None = None,
+) -> pl.Expr:
+    _validate_scalar_thresholds(loq, lod)
+
+    return pl.struct([biomarker.alias("_biomarker")]).map_batches(
+        lambda s: random_single_imputation_kernel(
+            s.struct.field("_biomarker"),
+            lod=lod,
+            loq=loq,
+            seed=seed,
+        ),
+        return_dtype=pl.Float64,
+    )
+
+
+FUNCTION_SPECS = [
+    DerivedFunctionSpec(
+        name="medium_bound_imputation_scalar_input",
+        kernel=medium_bound_imputation_scalar_input_kernel,
+        expr_builder=medium_bound_imputation_scalar_input_expr,
+    ),
+    DerivedFunctionSpec(
+        name="medium_bound_imputation",
+        kernel=medium_bound_imputation_kernel,
+        expr_builder=medium_bound_imputation_expr,
+    ),
+    DerivedFunctionSpec(
+        name="random_single_imputation",
+        kernel=random_single_imputation_kernel,
+        expr_builder=random_single_imputation_expr,
+    ),
+]

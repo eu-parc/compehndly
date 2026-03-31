@@ -1,63 +1,52 @@
-import pyarrow as pa
-import pyarrow.compute as pc
+from __future__ import annotations
+
+from functools import reduce
+import operator
+
+import polars as pl
+
+from compehndly.polars.kernels import DerivedFunctionSpec
 
 
-__registrations__ = []
+def summation_kernel(
+    *series: pl.Series, all_required: bool = True
+) -> pl.Series:
+    if not series:
+        raise ValueError("At least one input series is required")
 
+    lengths = {len(s) for s in series}
+    if len(lengths) != 1:
+        raise ValueError("All input series must have the same length")
 
-# TODO: move decorator for joint use
-def register(registry_name, name, version):
-    def decorator(func):
-        __registrations__.append((registry_name, name, version, func))
-        return func
+    length = len(series[0])
+    if all_required and any(s.null_count() == length for s in series):
+        return pl.Series([None] * length)
 
-    return decorator
-
-
-def _summation_v0_0_1_reference(
-    *arrays: float,
-    all_required=True,
-) -> float | None:
-    if not arrays:
-        raise ValueError("At least one input array is required")
-
-    if all_required:
-        if not any(x is not None for x in arrays):
-            return None
-
-    ret = 0
-    for val in arrays:
-        if val is not None:
-            ret += val
-
-    return ret
-
-
-@register(registry_name="default", name="summation", version="0.0.1")
-def _summation_v0_0_1_arrow(*arrays: pa.Array, all_required=True) -> pa.Array:
-    """
-    Vectorized summation over multiple Arrow arrays.
-
-    Semantics:
-    - If ANY input array is entirely null, return an all-null array.
-    - Otherwise, nulls are treated as zero during summation.
-    """
-
-    if not arrays:
-        raise ValueError("At least one input array is required")
-
-    length = len(arrays[0])
-
-    for arr in arrays:
-        if len(arr) != length:
-            raise ValueError("All input arrays must have the same length")
-
-        if arr.null_count == length and all_required:
-            return pa.nulls(length, type=pa.float64())
-
-    result = pc.fill_null(arrays[0], 0)
-
-    for arr in arrays[1:]:
-        result = pc.add(result, pc.fill_null(arr, 0))
+    result = series[0].fill_null(0)
+    for s in series[1:]:
+        result = result + s.fill_null(0)
 
     return result
+
+
+def summation_expr(*exprs: pl.Expr, all_required: bool = True) -> pl.Expr:
+    if not exprs:
+        raise ValueError("At least one input expression is required")
+
+    result = exprs[0].fill_null(0)
+    for expr in exprs[1:]:
+        result = result + expr.fill_null(0)
+
+    if not all_required:
+        return result
+
+    entirely_null_flags = [expr.is_null().all() for expr in exprs]
+    any_entirely_null = reduce(operator.or_, entirely_null_flags)
+    return pl.when(~any_entirely_null).then(result).otherwise(None)
+
+
+FUNCTION_SPEC = DerivedFunctionSpec(
+    name="summation",
+    kernel=summation_kernel,
+    expr_builder=summation_expr,
+)
