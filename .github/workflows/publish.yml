@@ -18,12 +18,12 @@ jobs:
         working-directory: ./python
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6.1.0
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Install build tools
         run: |
@@ -50,7 +50,7 @@ jobs:
           python -m twine check dist/*
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dist
           path: ./python/dist/
@@ -64,7 +64,7 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
