@@ -12,19 +12,16 @@ on:
 jobs:
   test:
     runs-on: ${{matrix.os}}
-    defaults:
-      run:
-        working-directory: ./python
     strategy:
       fail-fast: true
       matrix:
         os: [ubuntu-latest]
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.14']
         include:
           - os: windows-latest
-            python-version: '3.10'
+            python-version: '3.11'
           - os: macos-latest
-            python-version: '3.10'
+            python-version: '3.11'
 
     steps:
     - name: Cancel Previous Runs
@@ -47,13 +44,20 @@ jobs:
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       shell: bash
     
-    - name: Create and activate virtual environment
+    - name: Install Python dependencies
       run: |
-        uv venv
-        echo "VIRTUAL_ENV=$PWD/.venv" >> $GITHUB_ENV
-        echo "$PWD/.venv/bin" >> $GITHUB_PATH
+        cd python
+        uv sync --group test
       shell: bash
 
-    - name: Run all tests
-      run: echo "RUNNING TESTS"
+    - name: Run tests (Unix)
+      if: runner.os != 'Windows'
+      run: make python-test
+      shell: bash
+
+    - name: Run tests (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cd python
+        uv run pytest -q
       shell: bash

@@ -138,3 +138,7 @@ _temp/
 
 # VScode stuff
 .vscode
+.codex
+
+# R stuff
+.r-lib

@@ -1,0 +1,19 @@
+Package: compehndly
+Type: Package
+Title: Cross-Language Derived Variables for Exposure Health Data
+Version: 0.0.1
+Authors@R: c(
+    person("Gertjan", "Bisschop", email = "gertjan.bisschop@vito.be", role = c("aut", "cre")),
+    person("Caio", "Mescouto", email = "caio.mescouto@vito.be", role = "aut")
+)
+Description: Polars-based derived variable functions aligned with the Python implementation.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Suggests:
+    testthat (>= 3.0.0),
+    pkgload,
+    jsonlite,
+    polars
+Config/testthat/edition: 3

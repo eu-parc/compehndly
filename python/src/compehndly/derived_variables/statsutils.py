@@ -10,7 +10,9 @@ def fit_censored_lognorm(values_np, censored_np):
 
     # Require at least some uncensored observations
     if (~cens).sum() == 0:
-        raise RuntimeError("Cannot fit lognormal: all observations are censored.")
+        raise RuntimeError(
+            "Cannot fit lognormal: all observations are censored."
+        )
 
     def nll(params):
         sigma, mu = params
