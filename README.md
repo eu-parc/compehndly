@@ -1,7 +1,30 @@
-# Aim
+# compehndly
 
-This library acts as a community-maintained registry containing standardised functions to transform raw Personal Exposure Health (PEH) data.
+`compehndly` is a cross-language collection of derived-variable functions for
+Personal Exposure Health (PEH) data.
 
-# Calling registered functions
+Current focus:
 
-Functions registered in the library can be called as `compehndly.example_function["0.0.1"]` where `example_function` is a function with potentially different versions. Leaving out the version will result in calling the latest version of the function.
+- Python implementation (Polars-first, including LazyFrame workflows)
+- R implementation aligned to the same function behavior
+- shared conformance vectors to keep Python and R outputs consistent
+
+## Repository Layout
+
+- `python/`: Python package and tests
+- `R/`: R package scaffolding and tests
+- `shared/conformance/`: cross-language conformance cases
+
+## Documentation
+
+- Python usage and architecture:
+  - [python/README.md](python/README.md)
+- R usage and test setup:
+  - [R/README.md](R/README.md)
+- Shared conformance format:
+  - [shared/conformance/README.md](shared/conformance/README.md)
+
+## Conformance
+
+Python and R test runners consume this same file to detect drift across
+implementations.
