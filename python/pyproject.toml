@@ -1,6 +1,6 @@
 [project]
 name = "compehndly"
-version = "0.0.1"
+version = "0.0.1a2"
 description = "Personal Exposure Health Registry"
 readme = "README.md"
 authors = [
