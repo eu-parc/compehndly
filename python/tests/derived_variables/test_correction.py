@@ -65,6 +65,18 @@ class TestCorrection:
         expected = (chol * 2.27 + trigl + 62.3).to_numpy()
         assert np.allclose(out.to_numpy(), expected, equal_nan=True)
 
+    def test_consolidate_lipid_value_basic(self):
+        lipid_enz_harm = pl.Series([50.0, None, None])
+        lipid_enz_imp = pl.Series([1.0, 100.0, None])
+        lipid_imp = pl.Series([1.0, 1.0, 75.0])
+
+        out = apply(
+            "consolidate_lipid_value", lipid_enz_harm, lipid_enz_imp, lipid_imp
+        )
+        out_list = out.to_numpy().tolist()
+        expected = [50.0, 100.0, 75.0]
+        assert expected == out_list
+
     def test_standardize_lipid_basic(self):
         measured = pl.Series([50.0, 100.0, 75.0])
         lipid_value = pl.Series([666.3, 590.9, 724.3])

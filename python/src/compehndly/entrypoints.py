@@ -17,6 +17,7 @@ _STANDARDIZE = get_map_fn("standardize")
 _STANDARDIZE_CREATININE = get_map_fn("standardize_creatinine")
 _NORMALIZE_SPECIFIC_GRAVITY = get_map_fn("normalize_specific_gravity")
 _TOTAL_LIPID_CONCENTRATION = get_map_fn("total_lipid_concentration")
+_CONSOLIDATE_LIPID_VALUE = get_map_fn("consolidate_lipid_value")
 _STANDARDIZE_LIPID = get_map_fn("standardize_lipid")
 _MEDIUM_BOUND_IMPUTATION_SCALAR_INPUT = get_map_fn(
     "medium_bound_imputation_scalar_input"
@@ -80,6 +81,16 @@ def normalize_specific_gravity(
 
 def total_lipid_concentration(chol: pl.Series, trigl: pl.Series) -> pl.Series:
     return _TOTAL_LIPID_CONCENTRATION(chol=chol, trigl=trigl)
+
+
+def consolidate_lipid_value(
+    lipid_enz_harm: pl.Series, lipid_enz_imp: pl.Series, lipid_imp: pl.Series
+) -> pl.Series:
+    return _CONSOLIDATE_LIPID_VALUE(
+        lipid_enz_harm=lipid_enz_harm,
+        lipid_enz_imp=lipid_enz_imp,
+        lipid_imp=lipid_imp,
+    )
 
 
 def standardize_lipid(
@@ -157,6 +168,7 @@ __all__ = [
     "standardize_creatinine",
     "normalize_specific_gravity",
     "total_lipid_concentration",
+    "consolidate_lipid_value",
     "standardize_lipid",
     "medium_bound_imputation_scalar_input",
     "medium_bound_imputation",

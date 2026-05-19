@@ -49,6 +49,28 @@ def total_lipid_concentration_expr(chol: pl.Expr, trigl: pl.Expr) -> pl.Expr:
     return (chol * 2.27) + trigl + 62.3
 
 
+def consolidate_lipid_value_kernel(
+    lipid_enz_harm: pl.Series, lipid_enz_imp: pl.Series, lipid_imp: pl.Series
+) -> pl.Series:
+    length = len(lipid_enz_harm)
+    if len(lipid_enz_imp) != length:
+        raise ValueError(
+            "lipid_enz_harm and lipid_enz_imp must have the same length"
+        )
+    if len(lipid_imp) != length:
+        raise ValueError(
+            "lipid_enz_harm and lipid_imp must have the same length"
+        )
+
+    return lipid_enz_harm.fill_null(lipid_enz_imp).fill_null(lipid_imp)
+
+
+def consolidate_lipid_value_expr(
+    lipid_enz_harm: pl.Expr, lipid_enz_imp: pl.Expr, lipid_imp: pl.Expr
+) -> pl.Expr:
+    return lipid_enz_harm.fill_null(lipid_enz_imp).fill_null(lipid_imp)
+
+
 def standardize_lipid_kernel(
     measured: pl.Series, lipid_value: pl.Series
 ) -> pl.Series:
@@ -79,6 +101,11 @@ FUNCTION_SPECS = [
         name="total_lipid_concentration",
         kernel=total_lipid_concentration_kernel,
         expr_builder=total_lipid_concentration_expr,
+    ),
+    DerivedFunctionSpec(
+        name="consolidate_lipid_value",
+        kernel=consolidate_lipid_value_kernel,
+        expr_builder=consolidate_lipid_value_expr,
     ),
     DerivedFunctionSpec(
         name="standardize_lipid",
