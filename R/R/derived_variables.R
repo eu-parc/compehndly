@@ -238,16 +238,11 @@
   .to_series(out)
 }
 
-.dv_random_single_imputation <- function(biomarker, lod, loq, seed = NULL) {
-  lod_num <- .as_scalar_numeric(lod, "lod")
-  loq_num <- .as_scalar_numeric(loq, "loq")
-  .validate_thresholds(loq_num, lod_num)
-
-  biomarker_np <- .series_to_numeric(biomarker)
+.random_single_imputation_from_vectors <- function(biomarker_np, lod_v, loq_v, seed = NULL) {
   biomarker_filled <- ifelse(is.na(biomarker_np), -1, biomarker_np)
 
   censored <- biomarker_filled < 0
-  values_np <- ifelse(censored, lod_num, biomarker_filled)
+  values_np <- ifelse(censored, lod_v, biomarker_filled)
 
   fit <- .fit_censored_lognorm(values_np, censored)
 
@@ -263,13 +258,13 @@
   cat_below_loq <- biomarker_filled == -3
 
   lower[cat_below_lod] <- 0
-  upper[cat_below_lod] <- lod_num
+  upper[cat_below_lod] <- lod_v[cat_below_lod]
 
-  lower[cat_between] <- lod_num
-  upper[cat_between] <- loq_num
+  lower[cat_between] <- lod_v[cat_between]
+  upper[cat_between] <- loq_v[cat_between]
 
   lower[cat_below_loq] <- 0
-  upper[cat_below_loq] <- loq_num
+  upper[cat_below_loq] <- loq_v[cat_below_loq]
 
   cdf_lo <- plnorm(lower, meanlog = fit$mu, sdlog = fit$sigma)
   cdf_hi <- plnorm(upper, meanlog = fit$mu, sdlog = fit$sigma)
@@ -280,7 +275,43 @@
   out <- biomarker_filled
   out[censored] <- imputed[censored]
 
-  .to_series(out)
+  out
+}
+
+.dv_random_single_imputation_scalar_input <- function(biomarker, lod, loq, seed = NULL) {
+  lod_num <- .as_scalar_numeric(lod, "lod")
+  loq_num <- .as_scalar_numeric(loq, "loq")
+  .validate_thresholds(loq_num, lod_num)
+
+  biomarker_np <- .series_to_numeric(biomarker)
+  .to_series(.random_single_imputation_from_vectors(
+    biomarker_np = biomarker_np,
+    lod_v = rep(lod_num, length(biomarker_np)),
+    loq_v = rep(loq_num, length(biomarker_np)),
+    seed = seed
+  ))
+}
+
+.dv_random_single_imputation <- function(biomarker, lod, loq, seed = NULL) {
+  biomarker_np <- .series_to_numeric(biomarker)
+  lod_v <- .series_to_numeric(lod)
+  loq_v <- .series_to_numeric(loq)
+
+  .validate_same_length(biomarker_np, lod_v, loq_v)
+
+  if (any(is.na(lod_v)) || any(is.na(loq_v))) {
+    stop("lod and loq values must not be NA", call. = FALSE)
+  }
+  if (any(lod_v <= 0) || any(loq_v <= 0) || any(lod_v >= loq_v)) {
+    stop("lod values must be > 0 and < loq values", call. = FALSE)
+  }
+
+  .to_series(.random_single_imputation_from_vectors(
+    biomarker_np = biomarker_np,
+    lod_v = lod_v,
+    loq_v = loq_v,
+    seed = seed
+  ))
 }
 
 .DERIVED_FUNCTIONS <- list(
@@ -292,6 +323,7 @@
   standardize_lipid = .dv_standardize_lipid,
   medium_bound_imputation_scalar_input = .dv_medium_bound_imputation_scalar_input,
   medium_bound_imputation = .dv_medium_bound_imputation,
+  random_single_imputation_scalar_input = .dv_random_single_imputation_scalar_input,
   random_single_imputation = .dv_random_single_imputation
 )
 

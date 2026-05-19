@@ -18,6 +18,7 @@ class TestPolarsIntegration:
         names = set(list_functions())
         assert "summation" in names
         assert "standardize" in names
+        assert "random_single_imputation_scalar_input" in names
         assert "random_single_imputation" in names
 
     def test_get_map_fn_works_with_external_map_batches_pattern(self):

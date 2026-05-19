@@ -134,17 +134,14 @@ def medium_bound_imputation_expr(
     )
 
 
-def random_single_imputation_kernel(
-    biomarker: pl.Series,
-    lod: float,
-    loq: float,
+def _random_single_imputation_from_arrays(
+    biomarker_np: np.ndarray,
+    lod_np: np.ndarray,
+    loq_np: np.ndarray,
     min_unique_values: int = 0,
     min_observed_percentage: int = 0,
     seed: int | None = None,
-) -> pl.Series:
-    _validate_scalar_thresholds(loq, lod)
-
-    biomarker_np = biomarker.cast(pl.Float64).to_numpy()
+) -> np.ndarray:
     biomarker_filled = np.where(np.isnan(biomarker_np), -1.0, biomarker_np)
 
     # perform configurable data checks
@@ -153,7 +150,7 @@ def random_single_imputation_kernel(
     # check: at least [min_observed_percentage] % of the values are above LOD/LOQ
     if not checks_failed:
         count_above_lod_loq = np.count_nonzero(
-            biomarker_filled > (lod if lod else loq)
+            biomarker_filled > np.where(~np.isnan(lod_np), lod_np, loq_np)
         )
         if (
             count_above_lod_loq
@@ -163,17 +160,20 @@ def random_single_imputation_kernel(
 
     # check: at least [min_unique_values] unique values are observed above LOD/LOQ
     if not checks_failed:
+        above_lod_loq = biomarker_filled > np.where(
+            ~np.isnan(lod_np), lod_np, loq_np
+        )
         count_unique_values_above_lod_loq = np.unique(
-            biomarker_filled[biomarker_filled > (lod if lod else loq)]
+            biomarker_filled[above_lod_loq]
         ).size
         if count_unique_values_above_lod_loq < min_unique_values:
             checks_failed = True
 
     if checks_failed:
-        result = [np.nan] * biomarker_np.size
+        result = np.full(biomarker_np.size, np.nan)
     else:
         censored = biomarker_filled < 0
-        values_np = np.where(censored, lod, biomarker_filled)
+        values_np = np.where(censored, lod_np, biomarker_filled)
 
         dist = fit_censored_lognorm(values_np, censored)
         rng = np.random.default_rng(seed=seed)
@@ -186,13 +186,13 @@ def random_single_imputation_kernel(
         cat_below_loq = biomarker_filled == -3
 
         lower[cat_below_lod] = 0
-        upper[cat_below_lod] = lod
+        upper[cat_below_lod] = lod_np[cat_below_lod]
 
-        lower[cat_between] = lod
-        upper[cat_between] = loq
+        lower[cat_between] = lod_np[cat_between]
+        upper[cat_between] = loq_np[cat_between]
 
         lower[cat_below_loq] = 0
-        upper[cat_below_loq] = loq
+        upper[cat_below_loq] = loq_np[cat_below_loq]
 
         cdf_lo = dist.cdf(lower)
         cdf_hi = dist.cdf(upper)
@@ -203,10 +203,33 @@ def random_single_imputation_kernel(
         result = biomarker_filled.copy()
         result[censored] = imputed[censored]
 
+    return result
+
+
+def random_single_imputation_scalar_input_kernel(
+    biomarker: pl.Series,
+    lod: float,
+    loq: float,
+    min_unique_values: int = 0,
+    min_observed_percentage: int = 0,
+    seed: int | None = None,
+) -> pl.Series:
+    _validate_scalar_thresholds(loq, lod)
+
+    biomarker_np = biomarker.cast(pl.Float64).to_numpy()
+    result = _random_single_imputation_from_arrays(
+        biomarker_np=biomarker_np,
+        lod_np=np.full(biomarker_np.size, lod, dtype=float),
+        loq_np=np.full(biomarker_np.size, loq, dtype=float),
+        min_unique_values=min_unique_values,
+        min_observed_percentage=min_observed_percentage,
+        seed=seed,
+    )
+
     return pl.Series(result, dtype=pl.Float64)
 
 
-def random_single_imputation_expr(
+def random_single_imputation_scalar_input_expr(
     biomarker: pl.Expr,
     lod: float,
     loq: float,
@@ -217,10 +240,78 @@ def random_single_imputation_expr(
     _validate_scalar_thresholds(loq, lod)
 
     return pl.struct([biomarker.alias("_biomarker")]).map_batches(
-        lambda s: random_single_imputation_kernel(
+        lambda s: random_single_imputation_scalar_input_kernel(
             s.struct.field("_biomarker"),
             lod=lod,
             loq=loq,
+            min_unique_values=min_unique_values,
+            min_observed_percentage=min_observed_percentage,
+            seed=seed,
+        ),
+        return_dtype=pl.Float64,
+    )
+
+
+def random_single_imputation_kernel(
+    biomarker: pl.Series,
+    lod: pl.Series,
+    loq: pl.Series,
+    min_unique_values: int = 0,
+    min_observed_percentage: int = 0,
+    seed: int | None = None,
+) -> pl.Series:
+    length = len(biomarker)
+    if len(lod) != length:
+        raise ValueError("biomarker and lod must have the same length")
+    if len(loq) != length:
+        raise ValueError("biomarker and loq must have the same length")
+
+    biomarker_np = biomarker.cast(pl.Float64).to_numpy()
+    lod_np = lod.cast(pl.Float64).to_numpy()
+    loq_np = loq.cast(pl.Float64).to_numpy()
+
+    if np.any(np.isnan(lod_np)) or np.any(np.isnan(loq_np)):
+        raise ValueError("lod and loq values must not be NaN")
+
+    invalid_thresholds = (
+        (~np.isnan(lod_np) & (lod_np <= 0))
+        | (~np.isnan(loq_np) & (loq_np <= 0))
+        | (~np.isnan(lod_np) & ~np.isnan(loq_np) & (lod_np >= loq_np))
+    )
+    if np.any(invalid_thresholds):
+        raise ValueError("lod values must be > 0 and < loq values")
+
+    result = _random_single_imputation_from_arrays(
+        biomarker_np=biomarker_np,
+        lod_np=lod_np,
+        loq_np=loq_np,
+        min_unique_values=min_unique_values,
+        min_observed_percentage=min_observed_percentage,
+        seed=seed,
+    )
+
+    return pl.Series(result, dtype=pl.Float64)
+
+
+def random_single_imputation_expr(
+    biomarker: pl.Expr,
+    lod: pl.Expr,
+    loq: pl.Expr,
+    min_unique_values: int = 0,
+    min_observed_percentage: int = 0,
+    seed: int | None = None,
+) -> pl.Expr:
+    return pl.struct(
+        [
+            biomarker.alias("_biomarker"),
+            lod.alias("_lod"),
+            loq.alias("_loq"),
+        ]
+    ).map_batches(
+        lambda s: random_single_imputation_kernel(
+            biomarker=s.struct.field("_biomarker"),
+            lod=s.struct.field("_lod"),
+            loq=s.struct.field("_loq"),
             min_unique_values=min_unique_values,
             min_observed_percentage=min_observed_percentage,
             seed=seed,
@@ -239,6 +330,11 @@ FUNCTION_SPECS = [
         name="medium_bound_imputation",
         kernel=medium_bound_imputation_kernel,
         expr_builder=medium_bound_imputation_expr,
+    ),
+    DerivedFunctionSpec(
+        name="random_single_imputation_scalar_input",
+        kernel=random_single_imputation_scalar_input_kernel,
+        expr_builder=random_single_imputation_scalar_input_expr,
     ),
     DerivedFunctionSpec(
         name="random_single_imputation",

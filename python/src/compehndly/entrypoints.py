@@ -19,6 +19,9 @@ _MEDIUM_BOUND_IMPUTATION_SCALAR_INPUT = get_map_fn(
     "medium_bound_imputation_scalar_input"
 )
 _MEDIUM_BOUND_IMPUTATION = get_map_fn("medium_bound_imputation")
+_RANDOM_SINGLE_IMPUTATION_SCALAR_INPUT = get_map_fn(
+    "random_single_imputation_scalar_input"
+)
 _RANDOM_SINGLE_IMPUTATION = get_map_fn("random_single_imputation")
 
 
@@ -64,6 +67,12 @@ def random_single_imputation(**series_by_name: pl.Series) -> pl.Series:
     return _RANDOM_SINGLE_IMPUTATION(**series_by_name)
 
 
+def random_single_imputation_scalar_input(
+    **series_by_name: pl.Series,
+) -> pl.Series:
+    return _RANDOM_SINGLE_IMPUTATION_SCALAR_INPUT(**series_by_name)
+
+
 __all__ = [
     "summation",
     "summation_allow_partial",
@@ -74,5 +83,6 @@ __all__ = [
     "standardize_lipid",
     "medium_bound_imputation_scalar_input",
     "medium_bound_imputation",
+    "random_single_imputation_scalar_input",
     "random_single_imputation",
 ]
