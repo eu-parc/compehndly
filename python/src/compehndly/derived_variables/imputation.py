@@ -18,6 +18,32 @@ def _validate_scalar_thresholds(loq: float, lod: float | None = None) -> None:
             raise ValueError("lod must be < loq")
 
 
+def lab_sensitivity_dichotomization_kernel(
+    measurement: pl.Series,
+    loq: pl.Series,
+    lod: pl.Series | None = None,
+) -> pl.Series:
+    length = len(measurement)
+    if len(loq) != length:
+        raise ValueError("measurement and loq must have the same length")
+    if lod is not None and len(lod) != length:
+        raise ValueError("measurement and lod must have the same length")
+
+    result = [None] * len(measurement)
+    return pl.Series(name=measurement.name, values=result, dtype=pl.Float64)
+
+
+def lab_sensitivity_dichotomization_expr(
+    measurement: pl.Expr,
+    loq: pl.Expr,
+    lod: pl.Expr | None = None,
+) -> pl.Expr:
+    if lod is None:
+        return pl.when(measurement < loq).then(True).otherwise(False)
+
+    return pl.when(measurement < lod).then(True).otherwise(False)
+
+
 def medium_bound_imputation_scalar_input_kernel(
     measurement: pl.Series,
     loq: float,
@@ -321,6 +347,11 @@ def random_single_imputation_expr(
 
 
 FUNCTION_SPECS = [
+    DerivedFunctionSpec(
+        name="lab_sensitivity_dichotomization",
+        kernel=lab_sensitivity_dichotomization_kernel,
+        expr_builder=lab_sensitivity_dichotomization_expr,
+    ),
     DerivedFunctionSpec(
         name="medium_bound_imputation_scalar_input",
         kernel=medium_bound_imputation_scalar_input_kernel,
