@@ -25,12 +25,30 @@ _RANDOM_SINGLE_IMPUTATION_SCALAR_INPUT = get_map_fn(
 _RANDOM_SINGLE_IMPUTATION = get_map_fn("random_single_imputation")
 
 
-def summation(**series_by_name: pl.Series) -> pl.Series:
-    return _SUMMATION(**series_by_name)
+def summation(
+    cutoff: float | None = None,
+    **series_by_name: pl.Series,
+) -> pl.Series:
+    if cutoff is None:
+        return _SUMMATION(**series_by_name)
+    return get_map_fn(
+        "summation",
+        all_required=True,
+        cutoff=cutoff,
+    )(**series_by_name)
 
 
-def summation_allow_partial(**series_by_name: pl.Series) -> pl.Series:
-    return _SUMMATION_ALLOW_PARTIAL(**series_by_name)
+def summation_allow_partial(
+    cutoff: float | None = None,
+    **series_by_name: pl.Series,
+) -> pl.Series:
+    if cutoff is None:
+        return _SUMMATION_ALLOW_PARTIAL(**series_by_name)
+    return get_map_fn(
+        "summation",
+        all_required=False,
+        cutoff=cutoff,
+    )(**series_by_name)
 
 
 def standardize(measured: pl.Series, standard: pl.Series) -> pl.Series:

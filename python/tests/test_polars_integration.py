@@ -106,6 +106,26 @@ class TestPolarsIntegration:
         out = df.lazy().select(mapped.alias("sum_col")).collect()
         assert out["sum_col"].to_list() == [4.0, 4.0]
 
+    def test_entrypoint_path_extraction_for_summation_cutoff(self):
+        map_fn = self._extract_callable("compehndly.entrypoints.summation")
+        df = pl.DataFrame(
+            {
+                "a": [1.0, None, None, None, None],
+                "b": [None, 2.0, 3.0, None, None],
+            }
+        )
+
+        mapped = pl.struct(pl.col("a"), pl.col("b")).map_batches(
+            lambda s: map_fn(
+                cutoff=0.6,
+                a=s.struct.field("a"),
+                b=s.struct.field("b"),
+            ),
+            return_dtype=pl.Float64,
+        )
+        out = df.lazy().select(mapped.alias("sum_col")).collect()
+        assert out["sum_col"].null_count() == out.height
+
     def test_entrypoint_named_args_for_non_commutative_function(self):
         map_fn = self._extract_callable(
             "compehndly.entrypoints.normalize_specific_gravity"
