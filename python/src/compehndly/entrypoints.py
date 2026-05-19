@@ -8,6 +8,9 @@ from compehndly.api import get_map_fn
 # These wrappers are intentionally thin, but their public signatures mirror
 # the kernel kwargs that config-based loaders pass explicitly.
 
+_LAB_SENSITIVITY_DICHOTOMIZATION = get_map_fn(
+    "lab_sensitivity_dichotomization"
+)
 _SUMMATION = get_map_fn("summation", all_required=True)
 _SUMMATION_ALLOW_PARTIAL = get_map_fn("summation", all_required=False)
 _STANDARDIZE = get_map_fn("standardize")
@@ -23,6 +26,10 @@ _RANDOM_SINGLE_IMPUTATION_SCALAR_INPUT = get_map_fn(
     "random_single_imputation_scalar_input"
 )
 _RANDOM_SINGLE_IMPUTATION = get_map_fn("random_single_imputation")
+
+
+def lab_sensitivity_dichotomization(**series_by_name: pl.Series) -> pl.Series:
+    return _LAB_SENSITIVITY_DICHOTOMIZATION(**series_by_name)
 
 
 def summation(
@@ -143,6 +150,7 @@ def random_single_imputation_scalar_input(
 
 
 __all__ = [
+    "lab_sensitivity_dichotomization",
     "summation",
     "summation_allow_partial",
     "standardize",

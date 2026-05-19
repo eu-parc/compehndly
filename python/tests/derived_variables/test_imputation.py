@@ -7,6 +7,26 @@ from compehndly import apply
 
 @pytest.mark.derived
 class TestImputation:
+    def test_lab_sensitivity_dichotomization_basic(self):
+        df = pl.DataFrame(
+            {
+                "measurement": [-1.0, -2.0, -3.0, 1.0, 6.0, 7.0, 8.0],
+                "lod": [2.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0],
+                "loq": [4.0, 5.0, 6.0, 4.0, 4.0, 4.0, 4.0],
+            }
+        )
+
+        expr = apply(
+            "lab_sensitivity_dichotomization",
+            measurement=pl.col("measurement"),
+            lod=pl.col("lod"),
+            loq=pl.col("loq"),
+        )
+        out = df.lazy().select(expr.alias("imputed")).collect()["imputed"]
+
+        out_np = out.to_numpy()
+        assert out_np.tolist() == [True, True, True, True, False, False, False]
+
     def test_random_single_imputation_basic(self):
         biomarker = pl.Series([5.0, -1.0, -2.0, 10.0, -3.0, 8.0])
         lod = 2.0
