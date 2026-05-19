@@ -5,8 +5,8 @@ import polars as pl
 from compehndly.api import get_map_fn
 
 # Stable, path-addressable entrypoints for config-based loaders.
-# These wrappers intentionally have the map_batches contract:
-#   (**series_by_name) -> pl.Series
+# These wrappers are intentionally thin, but their public signatures mirror
+# the kernel kwargs that config-based loaders pass explicitly.
 
 _SUMMATION = get_map_fn("summation", all_required=True)
 _SUMMATION_ALLOW_PARTIAL = get_map_fn("summation", all_required=False)
@@ -33,44 +33,95 @@ def summation_allow_partial(**series_by_name: pl.Series) -> pl.Series:
     return _SUMMATION_ALLOW_PARTIAL(**series_by_name)
 
 
-def standardize(**series_by_name: pl.Series) -> pl.Series:
-    return _STANDARDIZE(**series_by_name)
+def standardize(measured: pl.Series, standard: pl.Series) -> pl.Series:
+    return _STANDARDIZE(measured=measured, standard=standard)
 
 
-def standardize_creatinine(**series_by_name: pl.Series) -> pl.Series:
-    return _STANDARDIZE_CREATININE(**series_by_name)
+def standardize_creatinine(measured: pl.Series, crt: pl.Series) -> pl.Series:
+    return _STANDARDIZE_CREATININE(measured=measured, crt=crt)
 
 
-def normalize_specific_gravity(**series_by_name: pl.Series) -> pl.Series:
-    return _NORMALIZE_SPECIFIC_GRAVITY(**series_by_name)
+def normalize_specific_gravity(
+    measured: pl.Series,
+    sg_measured: pl.Series,
+    sg_ref: float,
+) -> pl.Series:
+    return _NORMALIZE_SPECIFIC_GRAVITY(
+        measured=measured,
+        sg_measured=sg_measured,
+        sg_ref=sg_ref,
+    )
 
 
-def total_lipid_concentration(**series_by_name: pl.Series) -> pl.Series:
-    return _TOTAL_LIPID_CONCENTRATION(**series_by_name)
+def total_lipid_concentration(chol: pl.Series, trigl: pl.Series) -> pl.Series:
+    return _TOTAL_LIPID_CONCENTRATION(chol=chol, trigl=trigl)
 
 
-def standardize_lipid(**series_by_name: pl.Series) -> pl.Series:
-    return _STANDARDIZE_LIPID(**series_by_name)
+def standardize_lipid(
+    measured: pl.Series,
+    lipid_value: pl.Series,
+) -> pl.Series:
+    return _STANDARDIZE_LIPID(measured=measured, lipid_value=lipid_value)
 
 
 def medium_bound_imputation_scalar_input(
-    **series_by_name: pl.Series,
+    measurement: pl.Series,
+    loq: float,
+    lod: float | None = None,
 ) -> pl.Series:
-    return _MEDIUM_BOUND_IMPUTATION_SCALAR_INPUT(**series_by_name)
+    return _MEDIUM_BOUND_IMPUTATION_SCALAR_INPUT(
+        measurement=measurement,
+        loq=loq,
+        lod=lod,
+    )
 
 
-def medium_bound_imputation(**series_by_name: pl.Series) -> pl.Series:
-    return _MEDIUM_BOUND_IMPUTATION(**series_by_name)
+def medium_bound_imputation(
+    measurement: pl.Series,
+    loq: pl.Series,
+    lod: pl.Series | None = None,
+) -> pl.Series:
+    return _MEDIUM_BOUND_IMPUTATION(
+        measurement=measurement,
+        loq=loq,
+        lod=lod,
+    )
 
 
-def random_single_imputation(**series_by_name: pl.Series) -> pl.Series:
-    return _RANDOM_SINGLE_IMPUTATION(**series_by_name)
+def random_single_imputation(
+    biomarker: pl.Series,
+    lod: pl.Series,
+    loq: pl.Series,
+    min_unique_values: int = 0,
+    min_observed_percentage: int = 0,
+    seed: int | None = None,
+) -> pl.Series:
+    return _RANDOM_SINGLE_IMPUTATION(
+        biomarker=biomarker,
+        lod=lod,
+        loq=loq,
+        min_unique_values=min_unique_values,
+        min_observed_percentage=min_observed_percentage,
+        seed=seed,
+    )
 
 
 def random_single_imputation_scalar_input(
-    **series_by_name: pl.Series,
+    biomarker: pl.Series,
+    lod: float,
+    loq: float,
+    min_unique_values: int = 0,
+    min_observed_percentage: int = 0,
+    seed: int | None = None,
 ) -> pl.Series:
-    return _RANDOM_SINGLE_IMPUTATION_SCALAR_INPUT(**series_by_name)
+    return _RANDOM_SINGLE_IMPUTATION_SCALAR_INPUT(
+        biomarker=biomarker,
+        lod=lod,
+        loq=loq,
+        min_unique_values=min_unique_values,
+        min_observed_percentage=min_observed_percentage,
+        seed=seed,
+    )
 
 
 __all__ = [

@@ -127,3 +127,57 @@ class TestPolarsIntegration:
         out = df.lazy().select(mapped.alias("normalized")).collect()
         expected = (df["m"] * (1.024 - 1) / df["sg"]).to_list()
         assert out["normalized"].to_list() == expected
+
+    def test_entrypoint_named_args_for_standardize_creatinine(self):
+        map_fn = self._extract_callable(
+            "compehndly.entrypoints.standardize_creatinine"
+        )
+        df = pl.DataFrame({"m": [50.0, 100.0], "crt": [100.0, 80.0]})
+
+        mapped = pl.struct(
+            pl.col("m").alias("measured"),
+            pl.col("crt").alias("crt"),
+        ).map_batches(
+            lambda s: map_fn(
+                crt=s.struct.field("crt"),
+                measured=s.struct.field("measured"),
+            ),
+            return_dtype=pl.Float64,
+        )
+        out = df.lazy().select(mapped.alias("standardized")).collect()
+        expected = (df["m"] * 100 / df["crt"]).to_list()
+        assert out["standardized"].to_list() == expected
+
+    def test_entrypoint_named_args_for_total_lipid_concentration(self):
+        map_fn = self._extract_callable(
+            "compehndly.entrypoints.total_lipid_concentration"
+        )
+        df = pl.DataFrame({"chol": [200.0, 180.0], "trigl": [150.0, 120.0]})
+
+        mapped = pl.struct(pl.col("chol"), pl.col("trigl")).map_batches(
+            lambda s: map_fn(
+                trigl=s.struct.field("trigl"),
+                chol=s.struct.field("chol"),
+            ),
+            return_dtype=pl.Float64,
+        )
+        out = df.lazy().select(mapped.alias("lipid")).collect()
+        expected = (df["chol"] * 2.27 + df["trigl"] + 62.3).to_list()
+        assert out["lipid"].to_list() == expected
+
+    def test_entrypoint_scalar_kwargs_for_medium_bound_imputation(self):
+        map_fn = self._extract_callable(
+            "compehndly.entrypoints.medium_bound_imputation_scalar_input"
+        )
+        df = pl.DataFrame({"measurement": [0.2, 1.2, 2.5]})
+
+        mapped = pl.struct(pl.col("measurement")).map_batches(
+            lambda s: map_fn(
+                measurement=s.struct.field("measurement"),
+                loq=2.0,
+                lod=1.0,
+            ),
+            return_dtype=pl.Float64,
+        )
+        out = df.lazy().select(mapped.alias("imputed")).collect()
+        assert out["imputed"].to_list() == [0.5, 1.5, 2.5]
