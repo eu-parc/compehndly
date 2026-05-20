@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
 import polars as pl
 
 from compehndly.polars.kernels import DerivedFunctionSpec
@@ -49,26 +51,88 @@ def total_lipid_concentration_expr(chol: pl.Expr, trigl: pl.Expr) -> pl.Expr:
     return (chol * 2.27) + trigl + 62.3
 
 
+def _validate_priority(
+    priority: Sequence[str],
+    values_by_name: Mapping[str, object],
+) -> tuple[str, ...]:
+    if isinstance(priority, str):
+        raise TypeError("priority must be a sequence of input names")
+    if not priority:
+        raise ValueError("priority must contain at least one input name")
+
+    names: list[str] = []
+    seen: set[str] = set()
+    for name in priority:
+        if not isinstance(name, str):
+            raise TypeError("priority must contain only input names")
+        if not name:
+            raise ValueError("priority must not contain empty input names")
+        if name in seen:
+            raise ValueError(f"priority contains duplicate input name: {name}")
+        names.append(name)
+        seen.add(name)
+
+    value_names = set(values_by_name)
+    missing = [name for name in names if name not in value_names]
+    if missing:
+        missing_names = ", ".join(missing)
+        raise ValueError(
+            f"priority references unknown inputs: {missing_names}"
+        )
+
+    extra = sorted(value_names - seen)
+    if extra:
+        extra_names = ", ".join(extra)
+        raise ValueError(f"inputs are not listed in priority: {extra_names}")
+
+    return tuple(names)
+
+
+def coalesce_by_priority_kernel(
+    priority: Sequence[str],
+    **series_by_name: pl.Series,
+) -> pl.Series:
+    priority_names = _validate_priority(priority, series_by_name)
+
+    lengths = {len(series_by_name[name]) for name in priority_names}
+    if len(lengths) != 1:
+        raise ValueError("All input series must have the same length")
+
+    result = series_by_name[priority_names[0]]
+    for name in priority_names[1:]:
+        result = result.fill_null(series_by_name[name])
+
+    return result
+
+
+def coalesce_by_priority_expr(
+    priority: Sequence[str],
+    **exprs_by_name: pl.Expr,
+) -> pl.Expr:
+    priority_names = _validate_priority(priority, exprs_by_name)
+    return pl.coalesce([exprs_by_name[name] for name in priority_names])
+
+
 def consolidate_lipid_value_kernel(
     lipid_enz_harm: pl.Series, lipid_enz_imp: pl.Series, lipid_imp: pl.Series
 ) -> pl.Series:
-    length = len(lipid_enz_harm)
-    if len(lipid_enz_imp) != length:
-        raise ValueError(
-            "lipid_enz_harm and lipid_enz_imp must have the same length"
-        )
-    if len(lipid_imp) != length:
-        raise ValueError(
-            "lipid_enz_harm and lipid_imp must have the same length"
-        )
-
-    return lipid_enz_harm.fill_null(lipid_enz_imp).fill_null(lipid_imp)
+    return coalesce_by_priority_kernel(
+        priority=("lipid_enz_harm", "lipid_enz_imp", "lipid_imp"),
+        lipid_enz_harm=lipid_enz_harm,
+        lipid_enz_imp=lipid_enz_imp,
+        lipid_imp=lipid_imp,
+    )
 
 
 def consolidate_lipid_value_expr(
     lipid_enz_harm: pl.Expr, lipid_enz_imp: pl.Expr, lipid_imp: pl.Expr
 ) -> pl.Expr:
-    return lipid_enz_harm.fill_null(lipid_enz_imp).fill_null(lipid_imp)
+    return coalesce_by_priority_expr(
+        priority=("lipid_enz_harm", "lipid_enz_imp", "lipid_imp"),
+        lipid_enz_harm=lipid_enz_harm,
+        lipid_enz_imp=lipid_enz_imp,
+        lipid_imp=lipid_imp,
+    )
 
 
 def standardize_lipid_kernel(
@@ -101,6 +165,11 @@ FUNCTION_SPECS = [
         name="total_lipid_concentration",
         kernel=total_lipid_concentration_kernel,
         expr_builder=total_lipid_concentration_expr,
+    ),
+    DerivedFunctionSpec(
+        name="coalesce_by_priority",
+        kernel=coalesce_by_priority_kernel,
+        expr_builder=coalesce_by_priority_expr,
     ),
     DerivedFunctionSpec(
         name="consolidate_lipid_value",

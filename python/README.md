@@ -77,6 +77,15 @@ out_named = apply(
     sg_measured=df["sg_measured"],
     sg_ref=1.024,
 )
+
+# Flexible kwargs-only fallback order
+out_coalesced = apply(
+    "coalesce_by_priority",
+    primary=df["primary"],
+    secondary=df["secondary"],
+    fallback=df["fallback"],
+    priority=("primary", "secondary", "fallback"),
+)
 ```
 
 ## Current Scope

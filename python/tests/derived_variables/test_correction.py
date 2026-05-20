@@ -77,6 +77,45 @@ class TestCorrection:
         expected = [50.0, 100.0, 75.0]
         assert expected == out_list
 
+    def test_coalesce_by_priority_basic(self):
+        out = apply(
+            "coalesce_by_priority",
+            primary=pl.Series([None, 2.0, None, None]),
+            secondary=pl.Series([1.0, 20.0, None, None]),
+            fallback=pl.Series([10.0, 200.0, 30.0, None]),
+            priority=("primary", "secondary", "fallback"),
+        )
+
+        assert out.to_list() == [1.0, 2.0, 30.0, None]
+
+    def test_coalesce_by_priority_respects_priority_order(self):
+        out = apply(
+            "coalesce_by_priority",
+            primary=pl.Series([None, 2.0, None]),
+            secondary=pl.Series([1.0, 20.0, None]),
+            fallback=pl.Series([10.0, 200.0, 30.0]),
+            priority=("fallback", "secondary", "primary"),
+        )
+
+        assert out.to_list() == [10.0, 200.0, 30.0]
+
+    def test_coalesce_by_priority_rejects_unknown_priority_name(self):
+        with pytest.raises(ValueError, match="unknown inputs"):
+            apply(
+                "coalesce_by_priority",
+                primary=pl.Series([None]),
+                priority=("primary", "missing"),
+            )
+
+    def test_coalesce_by_priority_rejects_inputs_not_in_priority(self):
+        with pytest.raises(ValueError, match="not listed in priority"):
+            apply(
+                "coalesce_by_priority",
+                primary=pl.Series([None]),
+                fallback=pl.Series([1.0]),
+                priority=("primary",),
+            )
+
     def test_standardize_lipid_basic(self):
         measured = pl.Series([50.0, 100.0, 75.0])
         lipid_value = pl.Series([666.3, 590.9, 724.3])

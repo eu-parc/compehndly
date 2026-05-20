@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import polars as pl
 
 from compehndly.api import get_map_fn
@@ -81,6 +83,15 @@ def normalize_specific_gravity(
 
 def total_lipid_concentration(chol: pl.Series, trigl: pl.Series) -> pl.Series:
     return _TOTAL_LIPID_CONCENTRATION(chol=chol, trigl=trigl)
+
+
+def coalesce_by_priority(
+    priority: Sequence[str],
+    **series_by_name: pl.Series,
+) -> pl.Series:
+    return get_map_fn("coalesce_by_priority", priority=priority)(
+        **series_by_name
+    )
 
 
 def consolidate_lipid_value(
@@ -168,6 +179,7 @@ __all__ = [
     "standardize_creatinine",
     "normalize_specific_gravity",
     "total_lipid_concentration",
+    "coalesce_by_priority",
     "consolidate_lipid_value",
     "standardize_lipid",
     "medium_bound_imputation_scalar_input",

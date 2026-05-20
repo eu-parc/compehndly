@@ -80,6 +80,29 @@ class TestPolarsIntegration:
         expected = (df["m"] * (1.024 - 1) / df["sg"]).to_list()
         assert out["normalized"].to_list() == expected
 
+    def test_with_derived_column_supports_priority_coalesce_lazy(self):
+        df = pl.DataFrame(
+            {
+                "lab_a": [None, 2.0, None, None],
+                "lab_b": [1.0, 20.0, None, None],
+                "lab_c": [10.0, 200.0, 30.0, None],
+            }
+        )
+
+        out = with_derived_column(
+            frame=df.lazy(),
+            function_name="coalesce_by_priority",
+            input_columns={
+                "primary": "lab_a",
+                "secondary": "lab_b",
+                "fallback": "lab_c",
+            },
+            output_column="coalesced",
+            priority=("primary", "secondary", "fallback"),
+        ).collect()
+
+        assert out["coalesced"].to_list() == [1.0, 2.0, 30.0, None]
+
     def test_apply_rejects_mixed_positional_and_named_data_inputs(self):
         with pytest.raises(ValueError):
             apply(
@@ -184,6 +207,34 @@ class TestPolarsIntegration:
         out = df.lazy().select(mapped.alias("lipid")).collect()
         expected = (df["chol"] * 2.27 + df["trigl"] + 62.3).to_list()
         assert out["lipid"].to_list() == expected
+
+    def test_entrypoint_named_args_for_priority_coalesce(self):
+        map_fn = self._extract_callable(
+            "compehndly.entrypoints.coalesce_by_priority"
+        )
+        df = pl.DataFrame(
+            {
+                "lab_a": [None, 2.0, None, None],
+                "lab_b": [1.0, 20.0, None, None],
+                "lab_c": [10.0, 200.0, 30.0, None],
+            }
+        )
+
+        mapped = pl.struct(
+            pl.col("lab_a").alias("primary"),
+            pl.col("lab_b").alias("secondary"),
+            pl.col("lab_c").alias("fallback"),
+        ).map_batches(
+            lambda s: map_fn(
+                priority=("primary", "secondary", "fallback"),
+                primary=s.struct.field("primary"),
+                secondary=s.struct.field("secondary"),
+                fallback=s.struct.field("fallback"),
+            ),
+            return_dtype=pl.Float64,
+        )
+        out = df.lazy().select(mapped.alias("coalesced")).collect()
+        assert out["coalesced"].to_list() == [1.0, 2.0, 30.0, None]
 
     def test_entrypoint_scalar_kwargs_for_medium_bound_imputation(self):
         map_fn = self._extract_callable(
