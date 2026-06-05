@@ -171,6 +171,120 @@
   .to_series(out)
 }
 
+.as_bool_scalar <- function(x, name) {
+  if (is.logical(x) && length(x) == 1 && !is.na(x)) {
+    return(isTRUE(x))
+  }
+  if (is.numeric(x) && length(x) == 1 && x %in% c(0, 1)) {
+    return(as.logical(x))
+  }
+  stop(sprintf("%s must be a boolean scalar", name), call. = FALSE)
+}
+
+.parse_multiply_by_group_factors <- function(args) {
+  factors_by_index <- list()
+  invert_by_index <- list()
+  invalid_names <- character()
+
+  for (name in names(args)) {
+    value <- args[[name]]
+    if (startsWith(name, "factor_")) {
+      suffix <- sub("^factor_", "", name)
+      if (!grepl("^[0-9]+$", suffix)) {
+        invalid_names <- c(invalid_names, name)
+        next
+      }
+      if (!.is_polars_series(value)) {
+        stop(sprintf("%s must be a Polars Series", name), call. = FALSE)
+      }
+      factors_by_index[[suffix]] <- value
+    } else if (startsWith(name, "invert_")) {
+      suffix <- sub("^invert_", "", name)
+      if (!grepl("^[0-9]+$", suffix)) {
+        invalid_names <- c(invalid_names, name)
+        next
+      }
+      invert_by_index[[suffix]] <- .as_bool_scalar(value, name)
+    } else {
+      invalid_names <- c(invalid_names, name)
+    }
+  }
+
+  if (length(invalid_names) > 0) {
+    stop(
+      sprintf(
+        "Unexpected arguments for multiply_by_group: %s. Use factor_N/invert_N arguments.",
+        paste(sort(invalid_names), collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  indices <- sort(unique(c(
+    as.integer(names(factors_by_index)),
+    as.integer(names(invert_by_index))
+  )))
+  if (length(indices) == 0) {
+    stop("At least one factor_N argument is required", call. = FALSE)
+  }
+
+  missing_factors <- setdiff(indices, as.integer(names(factors_by_index)))
+  if (length(missing_factors) > 0) {
+    stop(
+      paste0(
+        "missing factor_",
+        missing_factors,
+        collapse = ", factor_"
+      ),
+      call. = FALSE
+    )
+  }
+
+  expected_indices <- seq_len(max(indices))
+  missing_indices <- setdiff(expected_indices, indices)
+  if (length(missing_indices) > 0) {
+    stop(
+      sprintf(
+        "factor_N/invert_N indices must start at 1 and be contiguous; missing indices: %s",
+        paste(missing_indices, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  lapply(indices, function(index) {
+    index_name <- as.character(index)
+    list(
+      index = index,
+      factor = factors_by_index[[index_name]],
+      invert = isTRUE(invert_by_index[[index_name]])
+    )
+  })
+}
+
+.dv_multiply_by_group <- function(..., scalar_factor = NULL) {
+  args <- list(...)
+  factors <- .parse_multiply_by_group_factors(args)
+
+  vectors <- lapply(factors, function(factor) .series_to_numeric(factor$factor))
+  do.call(.validate_same_length, vectors)
+
+  out <- rep(1.0, length(vectors[[1]]))
+  for (i in seq_along(factors)) {
+    if (isTRUE(factors[[i]]$invert)) {
+      out <- out / vectors[[i]]
+    } else {
+      out <- out * vectors[[i]]
+    }
+  }
+
+  if (!is.null(scalar_factor)) {
+    out <- out * as.numeric(scalar_factor)
+  }
+
+  .to_series(out)
+}
+
 .dv_standardize <- function(measured, standard) {
   .to_series(.series_to_numeric(measured) * 100 / .series_to_numeric(standard))
 }
@@ -460,6 +574,7 @@
 
 .DERIVED_FUNCTIONS <- list(
   summation = .dv_summation,
+  multiply_by_group = .dv_multiply_by_group,
   standardize = .dv_standardize,
   standardize_creatinine = .dv_standardize_creatinine,
   normalize_specific_gravity = .dv_normalize_specific_gravity,

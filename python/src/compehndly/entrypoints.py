@@ -15,6 +15,7 @@ _LAB_SENSITIVITY_DICHOTOMIZATION = get_map_fn(
 )
 _SUMMATION = get_map_fn("summation", all_required=True)
 _SUMMATION_ALLOW_PARTIAL = get_map_fn("summation", all_required=False)
+_MULTIPLY_BY_GROUP = get_map_fn("multiply_by_group")
 _STANDARDIZE = get_map_fn("standardize")
 _STANDARDIZE_CREATININE = get_map_fn("standardize_creatinine")
 _NORMALIZE_SPECIFIC_GRAVITY = get_map_fn("normalize_specific_gravity")
@@ -60,6 +61,17 @@ def summation_allow_partial(
         all_required=False,
         cutoff=cutoff,
     )(**series_by_name)
+
+
+def multiply_by_group(
+    *,
+    scalar_factor: float | None = None,
+    **kwargs: pl.Series | bool,
+) -> pl.Series:
+    return _MULTIPLY_BY_GROUP(
+        scalar_factor=scalar_factor,
+        **kwargs,
+    )
 
 
 def standardize(measured: pl.Series, standard: pl.Series) -> pl.Series:
@@ -187,6 +199,7 @@ __all__ = [
     "lab_sensitivity_dichotomization",
     "summation",
     "summation_allow_partial",
+    "multiply_by_group",
     "standardize",
     "standardize_creatinine",
     "normalize_specific_gravity",

@@ -21,6 +21,24 @@ Parameters:
 out = apply("summation", a, b, all_required=False)
 ```
 
+## Multiplication
+
+### `multiply_by_group`
+
+Multiplies indexed `factor_N` series or expressions. Set the scalar
+`invert_N=True` to divide by that factor instead. Indices start at `1`, are
+contiguous, and `invert_N` defaults to `False`.
+
+```python
+out = apply(
+    "multiply_by_group",
+    factor_1=pl.col("a"),
+    factor_2=pl.col("b"),
+    factor_3=pl.col("c"),
+    invert_3=True,
+)
+```
+
 ## Correction And Standardization
 
 ### `standardize`

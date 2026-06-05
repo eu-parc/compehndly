@@ -45,6 +45,96 @@
       }
     },
     {
+      "id": "multiply_by_group_basic",
+      "function": "multiply_by_group",
+      "input": {
+        "named": {
+          "factor_1": [2.0, 4.0, 6.0],
+          "factor_2": [3.0, 5.0, 7.0],
+          "factor_3": [2.0, 10.0, 3.0]
+        }
+      },
+      "params": {
+        "invert_3": true
+      },
+      "assertions": {
+        "expected": [3.0, 2.0, 14.0]
+      }
+    },
+    {
+      "id": "multiply_by_group_only_inverted_with_scalar",
+      "function": "multiply_by_group",
+      "input": {
+        "named": {
+          "factor_1": [2.0, 4.0]
+        }
+      },
+      "params": {
+        "invert_1": true,
+        "scalar_factor": 10.0
+      },
+      "assertions": {
+        "expected": [5.0, 2.5]
+      }
+    },
+    {
+      "id": "multiply_by_group_interleaves_inverse_factors",
+      "function": "multiply_by_group",
+      "input": {
+        "named": {
+          "factor_1": [1e200],
+          "factor_2": [1e200],
+          "factor_3": [1e200]
+        }
+      },
+      "params": {
+        "invert_2": true
+      },
+      "assertions": {
+        "expected": [1e200]
+      }
+    },
+    {
+      "id": "multiply_by_group_invert_without_factor_raises",
+      "function": "multiply_by_group",
+      "input": {
+        "named": {}
+      },
+      "params": {
+        "invert_1": true
+      },
+      "expect_error": {
+        "type": "ValueError"
+      }
+    },
+    {
+      "id": "multiply_by_group_unexpected_argument_raises",
+      "function": "multiply_by_group",
+      "input": {
+        "named": {
+          "factor_1": [1.0]
+        }
+      },
+      "params": {
+        "factors": "factor_1"
+      },
+      "expect_error": {
+        "type": "ValueError"
+      }
+    },
+    {
+      "id": "multiply_by_group_non_contiguous_factor_raises",
+      "function": "multiply_by_group",
+      "input": {
+        "named": {
+          "factor_2": [1.0]
+        }
+      },
+      "expect_error": {
+        "type": "ValueError"
+      }
+    },
+    {
       "id": "standardize_basic",
       "function": "standardize",
       "input": {

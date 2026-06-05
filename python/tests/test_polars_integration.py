@@ -17,6 +17,7 @@ class TestPolarsIntegration:
     def test_list_functions_exposes_registered_specs(self):
         names = set(list_functions())
         assert "summation" in names
+        assert "multiply_by_group" in names
         assert "standardize" in names
         assert "random_single_imputation_scalar_input" in names
         assert "random_single_imputation" in names
