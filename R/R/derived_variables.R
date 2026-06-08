@@ -2,6 +2,8 @@
   if (is.null(x)) y else x
 }
 
+.WEIGHT_PREFIX <- "weight__"
+
 .stop_if_missing_polars <- function() {
   if (!requireNamespace("polars", quietly = TRUE)) {
     stop("Package 'polars' is required.", call. = FALSE)
@@ -85,6 +87,104 @@
   }
 }
 
+.validate_cutoff <- function(cutoff) {
+  if (is.null(cutoff)) {
+    return(NULL)
+  }
+
+  cutoff_num <- .as_scalar_numeric(cutoff, "cutoff")
+  if (cutoff_num < 0 || cutoff_num > 1) {
+    stop("cutoff must be between 0 and 1", call. = FALSE)
+  }
+
+  cutoff_num
+}
+
+.is_series_like <- function(x) {
+  is.environment(x) && !is.null(x$to_list)
+}
+
+.split_named_weighted_inputs <- function(values_by_name) {
+  if (length(values_by_name) == 0) {
+    stop("At least one input series is required", call. = FALSE)
+  }
+
+  value_names <- names(values_by_name)
+  if (is.null(value_names) || any(is.na(value_names) | value_names == "")) {
+    stop("weighted_summation inputs must be named", call. = FALSE)
+  }
+
+  series_by_name <- list()
+  weights_by_name <- list()
+  unsupported <- character()
+
+  for (name in value_names) {
+    value <- values_by_name[[name]]
+
+    if (.is_series_like(value)) {
+      series_by_name[[name]] <- value
+      next
+    }
+
+    if (is.numeric(value) && length(value) == 1) {
+      if (!startsWith(name, .WEIGHT_PREFIX)) {
+        unsupported <- c(unsupported, name)
+        next
+      }
+
+      input_name <- substring(name, nchar(.WEIGHT_PREFIX) + 1)
+      if (input_name == "") {
+        unsupported <- c(unsupported, name)
+        next
+      }
+
+      weights_by_name[[input_name]] <- as.numeric(value)
+      next
+    }
+
+    unsupported <- c(unsupported, name)
+  }
+
+  if (length(unsupported) > 0) {
+    stop(
+      sprintf(
+        "weighted_summation accepts only series and numeric weights named '%s<input_name>'; unsupported inputs: %s",
+        .WEIGHT_PREFIX,
+        paste(unsupported, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  if (length(series_by_name) == 0) {
+    stop("At least one input series is required", call. = FALSE)
+  }
+
+  missing_weights <- sort(setdiff(names(series_by_name), names(weights_by_name)))
+  if (length(missing_weights) > 0) {
+    stop(
+      sprintf(
+        "inputs are missing weights: %s",
+        paste(sprintf("%s expects %s%s", missing_weights, .WEIGHT_PREFIX, missing_weights), collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  unknown_weights <- sort(setdiff(names(weights_by_name), names(series_by_name)))
+  if (length(unknown_weights) > 0) {
+    stop(
+      sprintf(
+        "weights reference unknown inputs: %s",
+        paste(sprintf("%s%s", .WEIGHT_PREFIX, unknown_weights), collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  list(series = series_by_name, weights = weights_by_name)
+}
+
 .fit_censored_lognorm <- function(values_np, censored_np) {
   if (sum(!censored_np) == 0) {
     stop("Cannot fit lognormal: all observations are censored.", call. = FALSE)
@@ -148,7 +248,7 @@
 
 # ---------------- Derived Variable Implementations ----------------
 
-.dv_summation <- function(..., all_required = TRUE) {
+.dv_summation <- function(..., all_required = TRUE, cutoff = NULL) {
   series <- list(...)
   if (length(series) == 0) {
     stop("At least one input is required", call. = FALSE)
@@ -159,7 +259,17 @@
 
   n <- length(vectors[[1]])
 
-  if (isTRUE(all_required)) {
+  cutoff_num <- .validate_cutoff(cutoff)
+  if (!is.null(cutoff_num)) {
+    has_sufficient_values <- any(vapply(
+      vectors,
+      function(v) n > 0 && sum(!is.na(v)) / n >= cutoff_num,
+      logical(1)
+    ))
+    if (!has_sufficient_values) {
+      return(.to_series(rep(NA_real_, n)))
+    }
+  } else if (isTRUE(all_required)) {
     any_entirely_null <- any(vapply(vectors, function(v) all(is.na(v)), logical(1)))
     if (any_entirely_null) {
       return(.to_series(rep(NA_real_, n)))
@@ -282,6 +392,35 @@
     out <- out * as.numeric(scalar_factor)
   }
 
+.dv_weighted_summation <- function(..., all_required = TRUE, cutoff = NULL) {
+  split_inputs <- .split_named_weighted_inputs(list(...))
+  vectors_by_name <- lapply(split_inputs$series, .series_to_numeric)
+  do.call(.validate_same_length, vectors_by_name)
+
+  n <- length(vectors_by_name[[1]])
+
+  cutoff_num <- .validate_cutoff(cutoff)
+  if (!is.null(cutoff_num)) {
+    has_sufficient_values <- any(vapply(
+      vectors_by_name,
+      function(v) n > 0 && sum(!is.na(v)) / n >= cutoff_num,
+      logical(1)
+    ))
+    if (!has_sufficient_values) {
+      return(.to_series(rep(NA_real_, n)))
+    }
+  } else if (isTRUE(all_required)) {
+    any_entirely_null <- any(vapply(vectors_by_name, function(v) all(is.na(v)), logical(1)))
+    if (any_entirely_null) {
+      return(.to_series(rep(NA_real_, n)))
+    }
+  }
+
+  weighted_vectors <- lapply(
+    names(vectors_by_name),
+    function(name) ifelse(is.na(vectors_by_name[[name]]), 0, vectors_by_name[[name]]) * split_inputs$weights[[name]]
+  )
+  out <- rowSums(do.call(cbind, weighted_vectors))
   .to_series(out)
 }
 
@@ -575,6 +714,7 @@
 .DERIVED_FUNCTIONS <- list(
   summation = .dv_summation,
   multiply_by_group = .dv_multiply_by_group,
+  weighted_summation = .dv_weighted_summation,
   standardize = .dv_standardize,
   standardize_creatinine = .dv_standardize_creatinine,
   normalize_specific_gravity = .dv_normalize_specific_gravity,
