@@ -1,0 +1,29 @@
+site_name: compehndly
+site_description: Cross-language derived-variable functions for Personal Exposure Health data.
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: mkdocs
+  nav_style: dark
+
+nav:
+  - Home: index.md
+  - Python:
+      - Overview: python/index.md
+      - Usage: python/usage.md
+      - Functions: python/functions.md
+      - Integration Patterns: python/integration.md
+      - Contributing Functions: python/contributing.md
+  - R:
+      - Overview: r/index.md
+      - Usage: r/usage.md
+      - Functions: r/functions.md
+      - Integration Patterns: r/integration.md
+  - Shared:
+      - Conformance: shared/conformance.md
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
