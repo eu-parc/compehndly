@@ -202,3 +202,81 @@ class TestImputation:
 
         expected = np.array([0.5, 1.5, 2.5])
         assert np.allclose(out.to_numpy(), expected, equal_nan=True)
+
+    def test_bin_decoding_series_replaces_filter_values(self):
+        out = apply(
+            "bin_decoding",
+            values=pl.Series("values", [-10.0, 1.25, -3.0, 4.5, -2.0]),
+            copy_from_1=pl.Series("copy_a", [10.0, 20.0, 30.0, 40.0, 50.0]),
+            filter_value_1=-10.0,
+            copy_from_2=pl.Series("copy_b", [60.0, 70.0, 80.0, 90.0, 100.0]),
+            filter_value_2=-3.0,
+        )
+
+        assert out.to_list() == [10.0, 1.25, 80.0, 4.5, -2.0]
+
+    def test_bin_decoding_expr_accepts_variable_filter_count(
+        self,
+    ):
+        df = pl.DataFrame(
+            {
+                "values": [-10.0, 1.25, -3.0, 4.5, -2.0, -1.0],
+                "copy_a": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
+                "copy_b": [70.0, 80.0, 90.0, 100.0, 110.0, 120.0],
+                "copy_c": [130.0, 140.0, 150.0, 160.0, 170.0, 180.0],
+                "copy_d": [190.0, 200.0, 210.0, 220.0, 230.0, 240.0],
+            }
+        )
+
+        expr = apply(
+            "bin_decoding",
+            values=pl.col("values"),
+            copy_from_1=pl.col("copy_a"),
+            filter_value_1=-10.0,
+            copy_from_2=pl.col("copy_b"),
+            filter_value_2=-3.0,
+            copy_from_3=pl.col("copy_c"),
+            filter_value_3=-2.0,
+            copy_from_4=pl.col("copy_d"),
+            filter_value_4=-1.0,
+        )
+        out = df.lazy().select(expr.alias("imputed")).collect()["imputed"]
+
+        assert out.to_list() == [10.0, 1.25, 90.0, 4.5, 170.0, 240.0]
+
+    def test_bin_decoding_requires_kwargs(self):
+        with pytest.raises(TypeError):
+            apply(
+                "bin_decoding",
+                pl.Series([-10.0]),
+                pl.Series([10.0]),
+                filter_value_1=-10.0,
+            )
+
+    def test_bin_decoding_requires_complete_pairs(self):
+        with pytest.raises(ValueError, match="missing copy_from_1"):
+            apply(
+                "bin_decoding",
+                values=pl.Series([-10.0]),
+                filter_value_1=-10.0,
+            )
+
+    def test_bin_decoding_requires_contiguous_indices(self):
+        with pytest.raises(ValueError, match="contiguous"):
+            apply(
+                "bin_decoding",
+                values=pl.Series([-10.0]),
+                copy_from_2=pl.Series([10.0]),
+                filter_value_2=-10.0,
+            )
+
+    def test_bin_decoding_rejects_duplicate_filter_values(self):
+        with pytest.raises(ValueError, match="unique"):
+            apply(
+                "bin_decoding",
+                values=pl.Series([-10.0]),
+                copy_from_1=pl.Series([10.0]),
+                filter_value_1=-10.0,
+                copy_from_2=pl.Series([20.0]),
+                filter_value_2=-10.0,
+            )

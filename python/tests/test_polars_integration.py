@@ -20,6 +20,7 @@ class TestPolarsIntegration:
         assert "standardize" in names
         assert "random_single_imputation_scalar_input" in names
         assert "random_single_imputation" in names
+        assert "bin_decoding" in names
 
     def test_get_map_fn_works_with_external_map_batches_pattern(self):
         df = pl.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
@@ -252,3 +253,30 @@ class TestPolarsIntegration:
         )
         out = df.lazy().select(mapped.alias("imputed")).collect()
         assert out["imputed"].to_list() == [0.5, 1.5, 2.5]
+
+    def test_entrypoint_kwargs_for_bin_decoding(self):
+        map_fn = self._extract_callable("compehndly.entrypoints.bin_decoding")
+        df = pl.DataFrame(
+            {
+                "values": [-10.0, 1.25, -3.0, 4.5],
+                "copy_a": [10.0, 20.0, 30.0, 40.0],
+                "copy_b": [50.0, 60.0, 70.0, 80.0],
+            }
+        )
+
+        mapped = pl.struct(
+            pl.col("values"),
+            pl.col("copy_a"),
+            pl.col("copy_b"),
+        ).map_batches(
+            lambda s: map_fn(
+                values=s.struct.field("values"),
+                copy_from_1=s.struct.field("copy_a"),
+                filter_value_1=-10.0,
+                copy_from_2=s.struct.field("copy_b"),
+                filter_value_2=-3.0,
+            ),
+            return_dtype=pl.Float64,
+        )
+        out = df.lazy().select(mapped.alias("imputed")).collect()
+        assert out["imputed"].to_list() == [10.0, 1.25, 70.0, 4.5]

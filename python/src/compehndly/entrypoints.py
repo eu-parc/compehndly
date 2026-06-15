@@ -25,6 +25,7 @@ _MEDIUM_BOUND_IMPUTATION_SCALAR_INPUT = get_map_fn(
     "medium_bound_imputation_scalar_input"
 )
 _MEDIUM_BOUND_IMPUTATION = get_map_fn("medium_bound_imputation")
+_BIN_DECODING = get_map_fn("bin_decoding")
 _RANDOM_SINGLE_IMPUTATION_SCALAR_INPUT = get_map_fn(
     "random_single_imputation_scalar_input"
 )
@@ -135,6 +136,17 @@ def medium_bound_imputation(
     )
 
 
+def bin_decoding(
+    *,
+    values: pl.Series,
+    **kwargs: pl.Series | float,
+) -> pl.Series:
+    return _BIN_DECODING(
+        values=values,
+        **kwargs,
+    )
+
+
 def random_single_imputation(
     biomarker: pl.Series,
     lod: pl.Series,
@@ -184,6 +196,7 @@ __all__ = [
     "standardize_lipid",
     "medium_bound_imputation_scalar_input",
     "medium_bound_imputation",
+    "bin_decoding",
     "random_single_imputation_scalar_input",
     "random_single_imputation",
 ]

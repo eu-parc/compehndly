@@ -92,6 +92,11 @@ Uses scalar `loq` and optional scalar `lod` thresholds.
 
 Uses series-valued `loq` and optional series-valued `lod` thresholds.
 
+### `bin_decoding`
+
+Copies from the paired `copy_from_N` column/expression when `values` equals
+the scalar `filter_value_N`; otherwise returns `values`.
+
 ### `random_single_imputation_scalar_input`
 
 Runs random single imputation with scalar `lod` and `loq` thresholds.
