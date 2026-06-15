@@ -60,6 +60,24 @@ out <- compehndly_apply(
 out$to_list()
 ```
 
+Bin decoding uses the same numbered pair contract as Python:
+
+```r
+values <- pl$Series(c(-10.0, 1.25, -3.0, 4.5))
+copy_a <- pl$Series(c(10.0, 20.0, 30.0, 40.0))
+copy_b <- pl$Series(c(50.0, 60.0, 70.0, 80.0))
+
+out <- compehndly_apply(
+  "bin_decoding",
+  values = values,
+  copy_from_1 = copy_a,
+  copy_from_2 = copy_b,
+  .params = list(filter_value_1 = -10.0, filter_value_2 = -3.0)
+)
+
+out$to_list()
+```
+
 ## Run Shared Conformance Tests
 
 Shared vectors live in:

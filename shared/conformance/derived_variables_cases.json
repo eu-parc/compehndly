@@ -120,6 +120,21 @@
       }
     },
     {
+      "id": "bin_decoding_named_pairs",
+      "function": "bin_decoding",
+      "input": {
+        "named": {
+          "values": [-10.0, 1.25, -3.0, 4.5, -2.0],
+          "copy_from_1": [10.0, 20.0, 30.0, 40.0, 50.0],
+          "copy_from_2": [60.0, 70.0, 80.0, 90.0, 100.0]
+        }
+      },
+      "params": {"filter_value_1": -10.0, "filter_value_2": -3.0},
+      "assertions": {
+        "expected": [10.0, 1.25, 80.0, 4.5, -2.0]
+      }
+    },
+    {
       "id": "random_single_imputation_scalar_input_basic",
       "function": "random_single_imputation_scalar_input",
       "input": {

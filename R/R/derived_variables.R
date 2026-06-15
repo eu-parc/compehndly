@@ -69,6 +69,10 @@
   stop(sprintf("Parameter '%s' must be scalar", name), call. = FALSE)
 }
 
+.is_polars_series <- function(x) {
+  is.environment(x) && !is.null(x$to_list)
+}
+
 .to_series <- function(values) {
   polars::pl$Series(values)
 }
@@ -238,6 +242,146 @@
   .to_series(out)
 }
 
+.parse_bin_decoding_pairs <- function(args) {
+  filter_value_by_index <- list()
+  copy_from_by_index <- list()
+  invalid_names <- character()
+
+  for (name in names(args)) {
+    value <- args[[name]]
+    if (startsWith(name, "filter_value_")) {
+      suffix <- sub("^filter_value_", "", name)
+      if (!grepl("^[0-9]+$", suffix)) {
+        invalid_names <- c(invalid_names, name)
+        next
+      }
+      filter_value_by_index[[suffix]] <- .as_scalar_numeric(value, name)
+    } else if (startsWith(name, "copy_from_")) {
+      suffix <- sub("^copy_from_", "", name)
+      if (!grepl("^[0-9]+$", suffix)) {
+        invalid_names <- c(invalid_names, name)
+        next
+      }
+      if (!.is_polars_series(value)) {
+        stop(sprintf("%s must be a Polars Series", name), call. = FALSE)
+      }
+      copy_from_by_index[[suffix]] <- value
+    } else {
+      invalid_names <- c(invalid_names, name)
+    }
+  }
+
+  if (length(invalid_names) > 0) {
+    stop(
+      sprintf(
+        "Unexpected arguments for bin_decoding: %s. Use filter_value_N/copy_from_N pairs.",
+        paste(sort(invalid_names), collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  indices <- sort(unique(c(
+    as.integer(names(filter_value_by_index)),
+    as.integer(names(copy_from_by_index))
+  )))
+  if (length(indices) == 0) {
+    stop(
+      "At least one filter_value_N/copy_from_N pair is required",
+      call. = FALSE
+    )
+  }
+
+  missing_filter_values <- setdiff(
+    indices,
+    as.integer(names(filter_value_by_index))
+  )
+  missing_copy_from <- setdiff(
+    indices,
+    as.integer(names(copy_from_by_index))
+  )
+  if (length(missing_filter_values) > 0 || length(missing_copy_from) > 0) {
+    message_parts <- character()
+    if (length(missing_filter_values) > 0) {
+      message_parts <- c(
+        message_parts,
+        paste0(
+          "missing filter_value_",
+          missing_filter_values,
+          collapse = ", filter_value_"
+        )
+      )
+    }
+    if (length(missing_copy_from) > 0) {
+      message_parts <- c(
+        message_parts,
+        paste0(
+          "missing copy_from_",
+          missing_copy_from,
+          collapse = ", copy_from_"
+        )
+      )
+    }
+    stop(paste(message_parts, collapse = "; "), call. = FALSE)
+  }
+
+  expected_indices <- seq_len(max(indices))
+  missing_indices <- setdiff(expected_indices, indices)
+  if (length(missing_indices) > 0) {
+    stop(
+      sprintf(
+        "filter_value_N/copy_from_N indices must start at 1 and be contiguous; missing indices: %s",
+        paste(missing_indices, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  filter_values <- vapply(
+    as.character(indices),
+    function(index) filter_value_by_index[[index]],
+    numeric(1)
+  )
+  non_na_filter_values <- filter_values[!is.na(filter_values)]
+  if (length(non_na_filter_values) != length(unique(non_na_filter_values))) {
+    stop("filter_value_N values must be unique", call. = FALSE)
+  }
+  if (sum(is.na(filter_values)) > 1) {
+    stop("filter_value_N values must be unique", call. = FALSE)
+  }
+
+  lapply(indices, function(index) {
+    index_name <- as.character(index)
+    list(
+      index = index,
+      filter_value = filter_value_by_index[[index_name]],
+      copy_from = copy_from_by_index[[index_name]]
+    )
+  })
+}
+
+.dv_bin_decoding <- function(values, ...) {
+  args <- list(...)
+  pairs <- .parse_bin_decoding_pairs(args)
+
+  values_v <- .series_to_numeric(values)
+  out <- values_v
+
+  for (pair in pairs) {
+    copy_from_v <- .series_to_numeric(pair$copy_from)
+    .validate_same_length(values_v, copy_from_v)
+
+    if (is.na(pair$filter_value)) {
+      mask <- is.na(values_v)
+    } else {
+      mask <- !is.na(values_v) & values_v == pair$filter_value
+    }
+    out[mask] <- copy_from_v[mask]
+  }
+
+  .to_series(out)
+}
+
 .random_single_imputation_from_vectors <- function(biomarker_np, lod_v, loq_v, seed = NULL) {
   biomarker_filled <- ifelse(is.na(biomarker_np), -1, biomarker_np)
 
@@ -323,6 +467,7 @@
   standardize_lipid = .dv_standardize_lipid,
   medium_bound_imputation_scalar_input = .dv_medium_bound_imputation_scalar_input,
   medium_bound_imputation = .dv_medium_bound_imputation,
+  bin_decoding = .dv_bin_decoding,
   random_single_imputation_scalar_input = .dv_random_single_imputation_scalar_input,
   random_single_imputation = .dv_random_single_imputation
 )
