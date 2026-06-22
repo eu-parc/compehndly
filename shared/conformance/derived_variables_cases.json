@@ -135,6 +135,57 @@
       }
     },
     {
+      "id": "weighted_summation_basic_named",
+      "function": "weighted_summation",
+      "input": {
+        "named": {
+          "a": [1.0, null, 3.0],
+          "b": [10.0, 20.0, null]
+        }
+      },
+      "params": {
+        "weight__a": 2.0,
+        "weight__b": 0.5
+      },
+      "assertions": {
+        "expected": [7.0, 10.0, 6.0]
+      }
+    },
+    {
+      "id": "weighted_summation_cutoff_any_input_passes",
+      "function": "weighted_summation",
+      "input": {
+        "named": {
+          "a": [1.0, null, null, null, null],
+          "b": [null, 2.0, 3.0, 4.0, null]
+        }
+      },
+      "params": {
+        "weight__a": 10.0,
+        "weight__b": 1.0,
+        "cutoff": 0.6
+      },
+      "assertions": {
+        "expected": [10.0, 2.0, 3.0, 4.0, 0.0]
+      }
+    },
+    {
+      "id": "weighted_summation_missing_weight_raises",
+      "function": "weighted_summation",
+      "input": {
+        "named": {
+          "a": [1.0],
+          "b": [2.0]
+        }
+      },
+      "params": {
+        "weight__a": 1.0
+      },
+      "expect_error": {
+        "type": "ValueError"
+      }
+    },
+    {
       "id": "standardize_basic",
       "function": "standardize",
       "input": {

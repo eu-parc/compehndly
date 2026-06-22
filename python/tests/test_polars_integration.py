@@ -14,10 +14,35 @@ class TestPolarsIntegration:
         module = importlib.import_module(module_name)
         return getattr(module, func_name)
 
+    def _run_entrypoint_map_batches(
+        self,
+        *,
+        path: str,
+        frame: pl.DataFrame,
+        struct_exprs,
+        call,
+        output_column: str,
+        return_dtype=pl.Float64,
+    ) -> pl.DataFrame:
+        """
+        Exercise the integration pattern used by config-based callers.
+
+        The caller resolves a stable entrypoint path, packs input columns into
+        a Polars struct, and calls the entrypoint from `map_batches` with
+        explicit named fields and scalar kwargs.
+        """
+        map_fn = self._extract_callable(path)
+        mapped = pl.struct(*struct_exprs).map_batches(
+            lambda s: call(map_fn, s),
+            return_dtype=return_dtype,
+        )
+        return frame.lazy().select(mapped.alias(output_column)).collect()
+
     def test_list_functions_exposes_registered_specs(self):
         names = set(list_functions())
         assert "summation" in names
         assert "multiply_by_group" in names
+        assert "weighted_summation" in names
         assert "standardize" in names
         assert "random_single_imputation_scalar_input" in names
         assert "random_single_imputation" in names
@@ -150,6 +175,32 @@ class TestPolarsIntegration:
         )
         out = df.lazy().select(mapped.alias("sum_col")).collect()
         assert out["sum_col"].null_count() == out.height
+
+    def test_entrypoint_path_extraction_for_weighted_summation(self):
+        df = pl.DataFrame(
+            {
+                "a": [1.0, None, 3.0],
+                "b": [10.0, 20.0, None],
+            }
+        )
+
+        out = self._run_entrypoint_map_batches(
+            path="compehndly.entrypoints.weighted_summation",
+            frame=df,
+            struct_exprs=[
+                pl.col("a"),
+                pl.col("b"),
+            ],
+            call=lambda map_fn, s: map_fn(
+                weight__b=0.5,
+                a=s.struct.field("a"),
+                weight__a=2.0,
+                b=s.struct.field("b"),
+            ),
+            output_column="weighted",
+        )
+
+        assert out["weighted"].to_list() == [7.0, 10.0, 6.0]
 
     def test_entrypoint_named_args_for_non_commutative_function(self):
         map_fn = self._extract_callable(
