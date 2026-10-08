@@ -1,0 +1,35 @@
+version: 2
+
+updates:
+  # Python dependencies declared in python/pyproject.toml
+  # (python/uv.lock is git-ignored, so the pip ecosystem is used
+  # instead of uv).
+  - package-ecosystem: "pip"
+    directory: "/python"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 3
+    versioning-strategy: increase
+    commit-message:
+      prefix: "deps"
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+
+  # GitHub Actions referenced from .github/workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
