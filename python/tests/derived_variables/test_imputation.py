@@ -236,9 +236,9 @@ class TestImputation:
         )
 
         out_np = out.to_numpy()
-        assert not np.any(
-            out_np < 0
-        ), "Censored values were not properly imputed."
+        assert not np.any(out_np < 0), (
+            "Censored values were not properly imputed."
+        )
         assert out_np[0] == 5.0
         assert out_np[3] == 10.0
         assert out_np[5] == 8.0
@@ -415,9 +415,9 @@ class TestImputation:
         )
 
         out_np = out.to_numpy()
-        assert np.all(
-            np.isnan(out_np)
-        ), "Failing check: all values should be NaN."
+        assert np.all(np.isnan(out_np)), (
+            "Failing check: all values should be NaN."
+        )
 
     def test_random_single_imputation_insufficient_unique_values(self):
         biomarker = pl.Series([5.0, -1.0, -2.0, 8.0, -3.0, 8.0])
@@ -434,9 +434,9 @@ class TestImputation:
         )
 
         out_np = out.to_numpy()
-        assert np.all(
-            np.isnan(out_np)
-        ), "Failing check: all values should be NaN."
+        assert np.all(np.isnan(out_np)), (
+            "Failing check: all values should be NaN."
+        )
 
     def test_random_single_imputation_requires_matching_threshold_lengths(
         self,
