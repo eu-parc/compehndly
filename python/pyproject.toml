@@ -1,13 +1,13 @@
 [project]
 name = "compehndly"
-version = "0.0.1a4"
+version = "0.0.1a5"
 description = "Personal Exposure Health Registry"
 readme = "README.md"
 authors = [
     { name = "Gertjan Bisschop", email = "gertjan.bisschop@vito.be" },
     { name = "Caio Mescouto", email = "caio.mescouto@vito.be" },
 ]
-requires-python = ">=3.10, <4.0.0"
+requires-python = ">=3.11, <3.16"
 dependencies = [
 	"polars>=2.0,<3.0",
 	"scipy",
