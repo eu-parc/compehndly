@@ -9,21 +9,21 @@ authors = [
 ]
 requires-python = ">=3.11, <3.16"
 dependencies = [
-	"polars>=2.0,<3.0",
+	"polars>=2.1.0,<3.0",
 	"scipy",
 ]
 
 [dependency-groups]
 test = [
-    "pytest>=8.2.0",
+    "pytest>=9.2.0",
 ]
 
 dev = [
-    "ruff>=0.4.4",
+    "ruff>=0.17.3",
     "black",
     "mypy",
     "isort",
-    "pytest-cov>=7.0.0",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.uv]
@@ -34,7 +34,7 @@ default-groups = [
 
 [project.optional-dependencies]
 test = [
-    "polars>=2.0,<3.0",
+    "polars>=2.1.0,<3.0",
 ]
 
 
